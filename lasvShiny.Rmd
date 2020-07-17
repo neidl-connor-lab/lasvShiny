@@ -1,0 +1,329 @@
+--- 
+title: "LASV Bioplex Protein Data"
+runtime: shiny
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    source_code: embed
+--- 
+
+
+```{r setup, include=FALSE}
+
+###-----Load Packages----
+
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(yaml,
+               knitr,
+               markdown,
+               shiny,
+               shinyWidgets,
+               devtools,
+               ggplot2,
+               stats,
+               statmod,
+               tidyverse,
+               pROC,
+               # readxl,
+               sqldf,
+               corrplot,
+               # cowplot,
+               openxlsx,
+               hablar,
+               ggpubr,
+               patchwork,
+               tidyr,
+               dplyr,
+               # mltools,
+               plotly, 
+               DT,
+               tiff, 
+               ggsci, 
+               DT, 
+               stargazer, 
+               svglite, 
+               Cairo, 
+               magrittr,
+               gghighlight,
+               flexdashboard,
+               ggrepel,
+               lubridate,
+               RColorBrewer, 
+               rJava)
+# load("~/lasvchal/Jamie/lasvClinical/lasvShiny/lasvClinical_20200623.Rdata")
+# library(yaml)
+# library(knitr)
+# library(rmarkdown)
+
+load("lasvClinical_20200623.Rdata")
+
+# adm_all <- adm_all %>% dplyr::rename_with(.cols = ct:CRE, .fn = get.pretty.name)
+
+units <- readxl::read_xlsx("units.xlsx")
+
+
+```
+
+
+Scatter
+=======================================================================
+
+Column 
+-----------------------------------------------------------------------
+
+### Chart A
+
+```{r}
+
+ui = fluidPage(
+    # Application title
+    titlePanel("Scatter Plot"),
+
+   # Sidebar with a slider input for number of bins
+
+    sidebarPanel(
+      # width = 5, offset = 1,
+        pickerInput("Factor1", "Factor 1 (x-axis)",
+                     choices  = colnames(adm_all %>% select(ct:CRE)),
+                     selected = "ct",
+                     options  = list(`actions-box` = TRUE), multiple = F
+                     ),
+         
+         pickerInput("Factor2", "Factor 2 (y-axis)",
+                     choices  = colnames(adm_all %>% select(ct:CRE)),
+                     selected = "PAI1",
+                     options  = list(`actions-box` = TRUE), multiple = F
+                     )
+      ),
+    
+
+   # sidebarPanel(
+   # 
+   #       sliderInput("Age",
+   #                   "Age",
+   #                   min = 0, max = 100, value = c(0, 100), ticks = TRUE, animate = F),
+   #       pickerInput(inputId  = "Outcome", label = "Outcome",
+   #                   choices  = levels(factor(adm_all$Outcome)),
+   #                   selected = levels(factor(adm_all$Outcome)),
+   #                   options  = list(`actions-box` = TRUE), multiple = T,
+   #                   ),
+   # 
+   #       pickerInput("dpi", "DPI",
+   #                   choices  = levels(factor(adm_all$dpi)),
+   #                   selected = levels(factor(adm_all$dpi)),
+   #                   options  = list(`actions-box` = TRUE), multiple = T
+   #                   ),
+   # 
+   #  ),
+
+      # Show a plot of the generated distribution
+    mainPanel(
+      tabsetPanel(
+        tabPanel( ("Scatter"),
+                  plotlyOutput("scatterPlot")
+                  ),
+
+        tabPanel( ("Box Plots"),
+                  plotlyOutput("single.box.plot", width = "100%", height = "100%")
+                  )
+
+        )
+
+      )
+   )
+
+  
+  
+server <- function(input, output, session) {
+  
+    output$scatterPlot <- renderPlotly({
+  
+      adm_all %>%
+        ggplot(aes_string(x=input$Factor1, y = input$Factor2)) +
+        scale_x_log10() + scale_y_log10() +
+        geom_point(aes(color=Outcome))
+    })
+  
+    box.select <- reactive ({
+      box.data %>%
+        dplyr::filter(Factor %in% c(input$Factor1, input$Factor2)) %>%
+        as.data.frame()
+    })
+  
+  
+    output$single.box.plot <- renderPlotly({
+        box.select() %>%
+          ggboxplot(x="Outcome", 
+                    y = "Value",
+                    color="Outcome",
+                    palette = c("red", "blue", "green4", "purple")) +
+          scale_x_discrete(labels=c("F", "S", "OFI", "HC")) +
+          # stat_compare_means(comparisons = my_comparisons,
+          #                    size=4,
+          #                    label = "p.signif",
+          #                    method = "wilcox.test") +
+          scale_y_log10() +
+          facet_wrap("Factor", scales = "free", ncol=2) +
+          # ylab(get.pretty.units("Factor")) +
+          theme(text = element_text(size=24),
+                plot.title = element_text(hjust = .5),
+                panel.grid.major = element_blank(),
+                panel.grid.minor = element_blank(),
+                panel.spacing = unit(1.25, "lines"),
+                axis.title.x = element_blank(),
+                axis.text = element_text(size = 20),
+                axis.title.y = element_blank(),
+                legend.position = "none", 
+                strip.background = element_blank(),
+                strip.placement = "outside")
+    })
+
+
+  }
+
+shinyApp(ui, server)
+
+```
+
+Boxplots
+=======================================================================
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Chart B
+
+```{r}
+if (interactive()) {
+
+
+
+ui <- fluidPage(
+  tags$h2("Update pickerInput"),
+
+  fluidRow(
+    column(
+      width = 5, offset = 1,
+      pickerInput(
+        inputId = "p1",
+        label = "classic update",
+        choices = rownames(mtcars)
+      )
+    ),
+    column(
+      width = 5,
+      pickerInput(
+        inputId = "p2",
+        label = "disabled update",
+        choices = rownames(mtcars)
+      )
+    )
+  ),
+
+  fluidRow(
+    column(
+      width = 10, offset = 1,
+      sliderInput(
+        inputId = "up",
+        label = "Select between models with mpg greater than :",
+        width = "50%",
+        min = min(mtcars$mpg),
+        max = max(mtcars$mpg),
+        value = min(mtcars$mpg),
+        step = 0.1
+      )
+    )
+  )
+
+)
+
+server <- function(input, output, session) {
+
+  observeEvent(input$up, {
+    mtcars2 <- mtcars[mtcars$mpg >= input$up, ]
+
+    # Method 1
+    updatePickerInput(session = session, inputId = "p1",
+                      choices = rownames(mtcars2))
+
+    # Method 2
+    disabled_choices <- !rownames(mtcars) %in% rownames(mtcars2)
+    updatePickerInput(
+      session = session, inputId = "p2",
+      choices = rownames(mtcars),
+      choicesOpt = list(
+        disabled = disabled_choices,
+        style = ifelse(disabled_choices,
+                       yes = "color: rgba(119, 119, 119, 0.5);",
+                       no = "")
+      )
+    )
+  }, ignoreInit = TRUE)
+
+}
+
+shinyApp(ui = ui, server = server)
+
+}
+# }
+```
+
+### Chart C
+
+
+```{r}
+if (interactive()) {
+
+# Example of UI with fluidPage
+ui <- fluidPage(
+
+  # Application title
+  titlePanel("Hello Shiny!"),
+
+  sidebarLayout(
+
+    # Sidebar with a slider input
+    sidebarPanel(
+      sliderInput("obs",
+                  "Number of observations:",
+                  min = 0,
+                  max = 1000,
+                  value = 500)
+    ),
+
+    # Show a plot of the generated distribution
+    mainPanel(
+      plotOutput("distPlot")
+    )
+  )
+)
+
+# Server logic
+server <- function(input, output) {
+  output$distPlot <- renderPlot({
+    hist(rnorm(input$obs))
+  })
+}
+
+# Complete app with UI and server components
+shinyApp(ui, server)
+
+
+# UI demonstrating column layouts
+ui <- fluidPage(
+  title = "Hello Shiny!",
+  fluidRow(
+    column(width = 4,
+      "4"
+    ),
+    column(width = 3, offset = 2,
+      "3 offset 2"
+    )
+  )
+)
+
+shinyApp(ui, server = function(input, output) { })
+}
+```
+
+
