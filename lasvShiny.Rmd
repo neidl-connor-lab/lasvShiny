@@ -5,10 +5,14 @@ output:
   flexdashboard::flex_dashboard:
     orientation: columns
     source_code: embed
+    theme: flatly 
+    vertical_layout: fill
+    storyboard: true
+    
+
 --- 
 
-
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, warning=FALSE, }
 
 ###-----Load Packages----
 
@@ -24,17 +28,14 @@ pacman::p_load(yaml,
                statmod,
                tidyverse,
                pROC,
-               # readxl,
                sqldf,
                corrplot,
-               # cowplot,
-               openxlsx,
+               readxl,
                hablar,
                ggpubr,
                patchwork,
                tidyr,
                dplyr,
-               # mltools,
                plotly, 
                DT,
                tiff, 
@@ -49,40 +50,40 @@ pacman::p_load(yaml,
                ggrepel,
                lubridate,
                RColorBrewer, 
-               rJava)
+               rJava, 
+               dygraphs)
 # load("~/lasvchal/Jamie/lasvClinical/lasvShiny/lasvClinical_20200623.Rdata")
 # library(yaml)
 # library(knitr)
 # library(rmarkdown)
 
-load("lasvClinical_20200623.Rdata")
+# load("lasvClinical_20200623.Rdata")
+options(scipen = 999)
+set.seed(1234)
+# pth <- dirname(rstudioapi::getSourceEditorContext()$path)
+# 
+# source("~/lasvchal/Jamie/lasvClinical/reviewers2020/dataPreProcessing.R")
+# pth <- "~/lasvchal/Jamie/lasvClinical/reviewers2020"
 
-# adm_all <- adm_all %>% dplyr::rename_with(.cols = ct:CRE, .fn = get.pretty.name)
 
-units <- readxl::read_xlsx("units.xlsx")
 
 
 ```
 
 
-Scatter
+Compare
 =======================================================================
 
-Column 
------------------------------------------------------------------------
-
-### Chart A
+## Compare Two Factors {data-height=600}
 
 ```{r}
 
-ui = fluidPage(
-    # Application title
-    titlePanel("Scatter Plot"),
 
-   # Sidebar with a slider input for number of bins
+  ui = fillPage(
 
+    
     sidebarPanel(
-      # width = 5, offset = 1,
+      # width = 3, 
         pickerInput("Factor1", "Factor 1 (x-axis)",
                      choices  = colnames(adm_all %>% select(ct:CRE)),
                      selected = "ct",
@@ -96,6 +97,90 @@ ui = fluidPage(
                      )
       ),
     
+
+    mainPanel(
+      tabsetPanel(
+        tabPanel( ("Scatter"),
+                  plotlyOutput("scatterPlot")
+                  ),
+
+        tabPanel( ("Box Plots"),
+                  plotlyOutput("single.box.plot")
+                  ), 
+        tabPanel( ("Stats"),
+                  plotOutput("single.box.stats")
+                  )
+        
+        )
+
+      )
+   )
+
+  
+  
+  server <- function(input, output, session) {
+
+  
+    output$scatterPlot <- renderPlotly({
+    
+      adm_all %>%
+        ggplot(aes_string(x=input$Factor1, y = input$Factor2)) +
+        scale_x_log10() + scale_y_log10() +
+        geom_point(aes(color=Outcome))
+    })
+  
+    box.select <- reactive ({
+      box.data  %>%
+        dplyr::filter(Factor %in% c(input$Factor1, input$Factor2)) %>%
+        as.data.frame() %>% 
+        ggboxplot(x="Outcome", 
+                    y = "Value",
+                    color="Outcome",
+                    palette = c("red", "blue", "green4", "purple")) +
+          scale_x_discrete(labels=c("F", "S", "OFI", "HC")) +
+          scale_y_log10() +
+          facet_wrap("Name_Units", scales = "free", ncol=2) +
+          # ylab(get.pretty.factor(c(input$Factor1, input$Factor2))) +
+          theme(text = element_text(size=24),
+                plot.title = element_text(hjust = .5),
+                panel.grid.major = element_blank(),
+                panel.grid.minor = element_blank(),
+                panel.spacing = unit(1.25, "lines"),
+                axis.title.x = element_blank(),
+                axis.text = element_text(size = 20),
+                axis.title.y = element_blank(),
+                legend.position = "none", 
+                strip.background = element_blank(),
+                strip.placement = "outside")
+    })
+  
+
+    output$single.box.plot <- renderPlotly({
+        box.select()
+    })
+    
+    output$single.box.stats <- renderPlot({
+        box.select() + stat_compare_means(comparisons = my_comparisons,
+                             # size=4,
+                             label = "p.signif",
+                             method = "wilcox.test")
+    })
+
+
+  }
+
+  shinyApp(ui, server)
+
+```
+
+Boxplots
+=======================================================================
+Column 
+-----------------------------------------------------------------------
+## By Protein Category 
+
+```{r}
+
 
    # sidebarPanel(
    # 
@@ -115,88 +200,6 @@ ui = fluidPage(
    #                   ),
    # 
    #  ),
-
-      # Show a plot of the generated distribution
-    mainPanel(
-      tabsetPanel(
-        tabPanel( ("Scatter"),
-                  plotlyOutput("scatterPlot")
-                  ),
-
-        tabPanel( ("Box Plots"),
-                  plotlyOutput("single.box.plot", width = "100%", height = "100%")
-                  )
-
-        )
-
-      )
-   )
-
-  
-  
-server <- function(input, output, session) {
-  
-    output$scatterPlot <- renderPlotly({
-  
-      adm_all %>%
-        ggplot(aes_string(x=input$Factor1, y = input$Factor2)) +
-        scale_x_log10() + scale_y_log10() +
-        geom_point(aes(color=Outcome))
-    })
-  
-    box.select <- reactive ({
-      box.data %>%
-        dplyr::filter(Factor %in% c(input$Factor1, input$Factor2)) %>%
-        as.data.frame()
-    })
-  
-  
-    output$single.box.plot <- renderPlotly({
-        box.select() %>%
-          ggboxplot(x="Outcome", 
-                    y = "Value",
-                    color="Outcome",
-                    palette = c("red", "blue", "green4", "purple")) +
-          scale_x_discrete(labels=c("F", "S", "OFI", "HC")) +
-          # stat_compare_means(comparisons = my_comparisons,
-          #                    size=4,
-          #                    label = "p.signif",
-          #                    method = "wilcox.test") +
-          scale_y_log10() +
-          facet_wrap("Factor", scales = "free", ncol=2) +
-          # ylab(get.pretty.units("Factor")) +
-          theme(text = element_text(size=24),
-                plot.title = element_text(hjust = .5),
-                panel.grid.major = element_blank(),
-                panel.grid.minor = element_blank(),
-                panel.spacing = unit(1.25, "lines"),
-                axis.title.x = element_blank(),
-                axis.text = element_text(size = 20),
-                axis.title.y = element_blank(),
-                legend.position = "none", 
-                strip.background = element_blank(),
-                strip.placement = "outside")
-    })
-
-
-  }
-
-shinyApp(ui, server)
-
-```
-
-Boxplots
-=======================================================================
-
-Column {data-width=350}
------------------------------------------------------------------------
-
-### Chart B
-
-```{r}
-if (interactive()) {
-
-
 
 ui <- fluidPage(
   tags$h2("Update pickerInput"),
@@ -264,12 +267,16 @@ server <- function(input, output, session) {
 
 shinyApp(ui = ui, server = server)
 
-}
-# }
+
 ```
 
-### Chart C
+ROC Curves
+=======================================================================
 
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+## By Protein Category 
 
 ```{r}
 if (interactive()) {
@@ -309,20 +316,6 @@ server <- function(input, output) {
 shinyApp(ui, server)
 
 
-# UI demonstrating column layouts
-ui <- fluidPage(
-  title = "Hello Shiny!",
-  fluidRow(
-    column(width = 4,
-      "4"
-    ),
-    column(width = 3, offset = 2,
-      "3 offset 2"
-    )
-  )
-)
-
-shinyApp(ui, server = function(input, output) { })
 }
 ```
 
