@@ -3,16 +3,16 @@ title: "LASV Bioplex Protein Data"
 runtime: shiny
 output: 
   flexdashboard::flex_dashboard:
-    orientation: columns
+    orientation: rows
     source_code: embed
     theme: flatly 
     vertical_layout: fill
-    storyboard: true
+    storyboard: false
     
 
 --- 
 
-```{r setup, include=FALSE, warning=FALSE, }
+```{r global, include=FALSE}
 
 ###-----Load Packages----
 
@@ -36,92 +36,85 @@ pacman::p_load(yaml,
                patchwork,
                tidyr,
                dplyr,
-               plotly, 
+               plotly,
                DT,
-               tiff, 
-               ggsci, 
-               DT, 
-               stargazer, 
-               svglite, 
-               Cairo, 
+               tiff,
+               ggsci,
+               DT,
+               stargazer,
+               svglite,
+               Cairo,
                magrittr,
                gghighlight,
                flexdashboard,
                ggrepel,
                lubridate,
-               RColorBrewer, 
-               rJava, 
+               RColorBrewer,
+               rJava,
                dygraphs)
-# load("~/lasvchal/Jamie/lasvClinical/lasvShiny/lasvClinical_20200623.Rdata")
-# library(yaml)
-# library(knitr)
-# library(rmarkdown)
 
-# load("lasvClinical_20200623.Rdata")
+# pacman::p_load(plotly, ggpubr, lubridate, shiny, flexdashboard)
+
+source("dataImport.R")
 options(scipen = 999)
 set.seed(1234)
-# pth <- dirname(rstudioapi::getSourceEditorContext()$path)
-# 
-# source("~/lasvchal/Jamie/lasvClinical/reviewers2020/dataPreProcessing.R")
-# pth <- "~/lasvchal/Jamie/lasvClinical/reviewers2020"
-
-
 
 
 ```
 
-
 Compare
 =======================================================================
 
-## Compare Two Factors {data-height=600}
+Row  {data-height=600}
+-----------------------------------------------------------------------
 
 ```{r}
 
 
-  ui = fillPage(
+  # ui = fillPage(
 
     
-    sidebarPanel(
+    # sidebarPanel(
       # width = 3, 
         pickerInput("Factor1", "Factor 1 (x-axis)",
                      choices  = colnames(adm_all %>% select(ct:CRE)),
                      selected = "ct",
                      options  = list(`actions-box` = TRUE), multiple = F
-                     ),
+                     )#,
          
          pickerInput("Factor2", "Factor 2 (y-axis)",
                      choices  = colnames(adm_all %>% select(ct:CRE)),
                      selected = "PAI1",
                      options  = list(`actions-box` = TRUE), multiple = F
                      )
-      ),
+      # )#,
     
-
-    mainPanel(
-      tabsetPanel(
-        tabPanel( ("Scatter"),
-                  plotlyOutput("scatterPlot")
-                  ),
-
-        tabPanel( ("Box Plots"),
-                  plotlyOutput("single.box.plot")
-                  ), 
-        tabPanel( ("Stats"),
-                  plotOutput("single.box.stats")
-                  )
-        
-        )
-
-      )
-   )
-
-  
-  
-  server <- function(input, output, session) {
+# 
+#     mainPanel(
+#       tabsetPanel(
+#         tabPanel( ("Scatter"),
+#                   plotlyOutput("scatterPlot")
+#                   ),
+# 
+#         tabPanel( ("Box Plots"),
+#                   plotlyOutput("single.box.plot")
+#                   ), 
+#         tabPanel( ("Stats"),
+#                   plotOutput("single.box.stats")
+#                   )
+#         
+#         )
+# 
+#       )
+   # )
 
   
-    output$scatterPlot <- renderPlotly({
+  # 
+  # server <- function(input, output, session) {
+  # 
+  # 
+  #   output$scatterPlot <- 
+    renderPlotly({
     
       adm_all %>%
         ggplot(aes_string(x=input$Factor1, y = input$Factor2)) +
@@ -129,144 +122,65 @@ Compare
         geom_point(aes(color=Outcome))
     })
   
-    box.select <- reactive ({
-      box.data  %>%
-        dplyr::filter(Factor %in% c(input$Factor1, input$Factor2)) %>%
-        as.data.frame() %>% 
-        ggboxplot(x="Outcome", 
-                    y = "Value",
-                    color="Outcome",
-                    palette = c("red", "blue", "green4", "purple")) +
-          scale_x_discrete(labels=c("F", "S", "OFI", "HC")) +
-          scale_y_log10() +
-          facet_wrap("Name_Units", scales = "free", ncol=2) +
-          # ylab(get.pretty.factor(c(input$Factor1, input$Factor2))) +
-          theme(text = element_text(size=24),
-                plot.title = element_text(hjust = .5),
-                panel.grid.major = element_blank(),
-                panel.grid.minor = element_blank(),
-                panel.spacing = unit(1.25, "lines"),
-                axis.title.x = element_blank(),
-                axis.text = element_text(size = 20),
-                axis.title.y = element_blank(),
-                legend.position = "none", 
-                strip.background = element_blank(),
-                strip.placement = "outside")
-    })
-  
 
-    output$single.box.plot <- renderPlotly({
-        box.select()
-    })
-    
-    output$single.box.stats <- renderPlot({
+  # }
+  # 
+  # shinyApp(ui, server)
+
+```
+
+Row {.tabset .tabset-fade data-height=600}
+-----------------------------------------------------------------------
+
+### Boxplots
+
+```{r}
+
+
+box.select <- reactive ({
+  box.data  %>%
+    dplyr::filter(Factor %in% c(input$Factor1, input$Factor2)) %>%
+    as.data.frame() %>%
+    ggboxplot(x="Outcome", 
+                y = "Value",
+                color="Outcome",
+                palette = c("red", "blue", "green4", "purple")) +
+      scale_x_discrete(labels=c("F", "S", "OFI", "HC")) +
+      scale_y_log10() +
+      facet_wrap("Name_Units", scales = "free", ncol=2) +
+      # ylab(get.pretty.factor(c(input$Factor1, input$Factor2))) +
+      theme(text = element_text(size=24),
+            plot.title = element_text(hjust = .5),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            panel.spacing = unit(1.25, "lines"),
+            axis.title.x = element_blank(),
+            axis.text = element_text(size = 20),
+            axis.title.y = element_blank(),
+            legend.position = "none",
+            strip.background = element_blank(),
+            strip.placement = "outside")
+})
+
+
+# output$single.box.plot <-
+renderPlotly({
+    box.select()
+})
+ 
+
+```
+
+### Stats
+
+```{r}
+   # output$single.box.stats <-
+    renderPlot({
         box.select() + stat_compare_means(comparisons = my_comparisons,
                              # size=4,
                              label = "p.signif",
                              method = "wilcox.test")
     })
-
-
-  }
-
-  shinyApp(ui, server)
-
-```
-
-Boxplots
-=======================================================================
-Column 
------------------------------------------------------------------------
-## By Protein Category 
-
-```{r}
-
-
-   # sidebarPanel(
-   # 
-   #       sliderInput("Age",
-   #                   "Age",
-   #                   min = 0, max = 100, value = c(0, 100), ticks = TRUE, animate = F),
-   #       pickerInput(inputId  = "Outcome", label = "Outcome",
-   #                   choices  = levels(factor(adm_all$Outcome)),
-   #                   selected = levels(factor(adm_all$Outcome)),
-   #                   options  = list(`actions-box` = TRUE), multiple = T,
-   #                   ),
-   # 
-   #       pickerInput("dpi", "DPI",
-   #                   choices  = levels(factor(adm_all$dpi)),
-   #                   selected = levels(factor(adm_all$dpi)),
-   #                   options  = list(`actions-box` = TRUE), multiple = T
-   #                   ),
-   # 
-   #  ),
-
-ui <- fluidPage(
-  tags$h2("Update pickerInput"),
-
-  fluidRow(
-    column(
-      width = 5, offset = 1,
-      pickerInput(
-        inputId = "p1",
-        label = "classic update",
-        choices = rownames(mtcars)
-      )
-    ),
-    column(
-      width = 5,
-      pickerInput(
-        inputId = "p2",
-        label = "disabled update",
-        choices = rownames(mtcars)
-      )
-    )
-  ),
-
-  fluidRow(
-    column(
-      width = 10, offset = 1,
-      sliderInput(
-        inputId = "up",
-        label = "Select between models with mpg greater than :",
-        width = "50%",
-        min = min(mtcars$mpg),
-        max = max(mtcars$mpg),
-        value = min(mtcars$mpg),
-        step = 0.1
-      )
-    )
-  )
-
-)
-
-server <- function(input, output, session) {
-
-  observeEvent(input$up, {
-    mtcars2 <- mtcars[mtcars$mpg >= input$up, ]
-
-    # Method 1
-    updatePickerInput(session = session, inputId = "p1",
-                      choices = rownames(mtcars2))
-
-    # Method 2
-    disabled_choices <- !rownames(mtcars) %in% rownames(mtcars2)
-    updatePickerInput(
-      session = session, inputId = "p2",
-      choices = rownames(mtcars),
-      choicesOpt = list(
-        disabled = disabled_choices,
-        style = ifelse(disabled_choices,
-                       yes = "color: rgba(119, 119, 119, 0.5);",
-                       no = "")
-      )
-    )
-  }, ignoreInit = TRUE)
-
-}
-
-shinyApp(ui = ui, server = server)
-
 
 ```
 
@@ -276,7 +190,7 @@ ROC Curves
 Column {data-width=350}
 -----------------------------------------------------------------------
 
-## By Protein Category 
+## By Protein Category
 
 ```{r}
 if (interactive()) {
@@ -319,4 +233,50 @@ shinyApp(ui, server)
 }
 ```
 
+Demographics
+=======================================================================
 
+Column {data-width=350 }
+-----------------------------------------------------------------------
+
+```{r}
+
+# not allowing for id or Age as choices
+
+inputPanel(radioButtons("Group", h4("Group by (x-axis)"),
+             choices  = colnames(metaPatients)[-c(1,4)],
+             selected = "Dataset"
+             ),
+    
+    radioButtons("Fill", h4("Color"),
+                 choices  = colnames(metaPatients)[-c(1,4)],
+                 selected = "Outcome",
+                 ),
+    
+    radioButtons("Pos", h4("Bar Position"),
+                 choices = c("stack", "dodge"), 
+                 selected = "dodge")
+#     , 
+#     
+#     sliderInput("ageBins", "Bins (age groups)", value = 5,
+#                 min = 1, max = 20)
+)
+
+
+# for everything but Age, need 'stat = "count"' in histogram
+# for Age, need the binwidth
+
+renderPlotly({
+    metaPatients %>%
+        ggplot(aes_string(x=input$Group, fill=input$Fill)) +
+        geom_histogram(
+            # binwidth = as.numeric(input$ageBins), 
+            stat = "count",
+            position = input$Pos
+                       ) +
+        theme_pubr() 
+})
+
+
+
+```
