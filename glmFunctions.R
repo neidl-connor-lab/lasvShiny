@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 ###-----Select Data Functions----
 
 
@@ -271,7 +272,7 @@ epi.summary <- function(cyto.data) {
 
     return(results)
 }
-=======
+
 ###-----Select Data Functions----
 
 
@@ -544,4 +545,3 @@ epi.summary <- function(cyto.data) {
 
     return(results)
 }
->>>>>>> c8cb3ed65ca09d5cc664479a3536b0f85c423c48
