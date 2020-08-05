@@ -74,20 +74,24 @@ Row  {data-height=600}
   # ui = fillPage(
 
     
-    # sidebarPanel(
-      # width = 3, 
+    sidebarPanel(
+      # width = 3,
         pickerInput("Factor1", "Factor 1 (x-axis)",
                      choices  = colnames(adm_all %>% select(ct:CRE)),
                      selected = "ct",
                      options  = list(`actions-box` = TRUE), multiple = F
-                     )#,
-         
+                     ),
+
          pickerInput("Factor2", "Factor 2 (y-axis)",
                      choices  = colnames(adm_all %>% select(ct:CRE)),
                      selected = "PAI1",
                      options  = list(`actions-box` = TRUE), multiple = F
-                     )
-      # )#,
+                     ),
+        
+        radioButtons("Color", "Color",
+                 choices  = colnames(metaPatients)[-c(1,4)],
+                 selected = "Outcome")
+      )#,
     
 # 
 #     mainPanel(
@@ -116,10 +120,11 @@ Row  {data-height=600}
   #   output$scatterPlot <- 
     renderPlotly({
     
-      adm_all %>%
+      adm_all %>% left_join(metaPatients %>% select(-Outcome, -Age), 
+                            by = "id") %>%
         ggplot(aes_string(x=input$Factor1, y = input$Factor2)) +
         scale_x_log10() + scale_y_log10() +
-        geom_point(aes(color=Outcome))
+        geom_point(aes_string(color=input$Color))
     })
   
 
@@ -187,50 +192,50 @@ renderPlotly({
 ROC Curves
 =======================================================================
 
-Column {data-width=350}
+Row {data-width=350}
 -----------------------------------------------------------------------
 
-## By Protein Category
-
 ```{r}
-if (interactive()) {
 
-# Example of UI with fluidPage
-ui <- fluidPage(
+sidebarPanel(selectizeInput("Plot1", "Plot 1",
+             choices  = colnames(adm_all %>% select(TNFa:RANTES)),
+             selected = "PAI1",
+             options  = list(`actions-box` = TRUE), 
+             multiple = T
+             ),
+             
+          selectizeInput("Plot2", "Plot 2",
+             choices  = colnames(adm_all %>% select(TNFa:RANTES)),
+             selected = "TM",
+             options  = list(`actions-box` = TRUE), 
+             multiple = T
+             ))
 
-  # Application title
-  titlePanel("Hello Shiny!"),
-
-  sidebarLayout(
-
-    # Sidebar with a slider input
-    sidebarPanel(
-      sliderInput("obs",
-                  "Number of observations:",
-                  min = 0,
-                  max = 1000,
-                  value = 500)
-    ),
-
-    # Show a plot of the generated distribution
-    mainPanel(
-      plotOutput("distPlot")
-    )
-  )
-)
-
-# Server logic
-server <- function(input, output) {
-  output$distPlot <- renderPlot({
-    hist(rnorm(input$obs))
-  })
-}
-
-# Complete app with UI and server components
-shinyApp(ui, server)
+f <- glmFits(adm_all, cytokines = cytokines) %>% 
+  rocFits(.)
+names(f) <- cytokines
 
 
-}
+renderPlotly({
+    pROC::ggroc(f[input$Plot1])+
+        coord_fixed() +
+        scale_color_lancet(labels=get.pretty.name(input$Plot1))+
+        theme_pubr() +
+        theme(legend.position = c(0.65, 0.4),
+              legend.text = element_text(size = 12),
+              legend.title = element_blank()) 
+})
+
+renderPlotly({
+    pROC::ggroc(f[input$Plot2])+
+        coord_fixed() +
+        scale_color_lancet(labels=get.pretty.name(input$Plot2))+
+        theme_pubr() +
+        theme(legend.position = c(0.65, 0.4),
+              legend.text = element_text(size = 12),
+              legend.title = element_blank()) 
+})
+
 ```
 
 Demographics
@@ -243,14 +248,14 @@ Column {data-width=350 }
 
 # not allowing for id or Age as choices
 
-inputPanel(radioButtons("Group", h4("Group by (x-axis)"),
+sidebarPanel(radioButtons("Group", h4("Group by (x-axis)"),
              choices  = colnames(metaPatients)[-c(1,4)],
              selected = "Dataset"
              ),
     
     radioButtons("Fill", h4("Color"),
                  choices  = colnames(metaPatients)[-c(1,4)],
-                 selected = "Outcome",
+                 selected = "Outcome"
                  ),
     
     radioButtons("Pos", h4("Bar Position"),

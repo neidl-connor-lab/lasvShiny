@@ -34,8 +34,8 @@ cytoAll <- cyto_all_patients_dpi_corrected %>%
         id %in% primaryIDs ~ "Primary",
         !id %in% primaryIDs ~ "Secondary"
             ) %>% factor(),
-        date=date(date),
-        date.onset=date(date.onset)
+        date.onset=lubridate::date(date.onset),
+        date=lubridate::date(date)
         ) %>%
     relocate(Dataset, .after=id)
 
