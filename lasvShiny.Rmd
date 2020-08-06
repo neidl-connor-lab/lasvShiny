@@ -1,14 +1,13 @@
 --- 
-title: "LASV Bioplex Protein Data"
+title: "LASV Bioplex Analysis"
 runtime: shiny
 output: 
   flexdashboard::flex_dashboard:
     orientation: rows
-    source_code: embed
+    source_code: https://github.com/neidl-connor-lab/lasvShiny
     theme: flatly 
     vertical_layout: fill
-    storyboard: false
-    
+
 
 --- 
 
@@ -28,30 +27,30 @@ pacman::p_load(yaml,
                statmod,
                tidyverse,
                pROC,
-               sqldf,
+               # sqldf,
                corrplot,
                readxl,
                hablar,
                ggpubr,
                patchwork,
-               tidyr,
-               dplyr,
+               # tidyr,
+               # dplyr,
                plotly,
                DT,
-               tiff,
+               # tiff,
                ggsci,
-               DT,
-               stargazer,
-               svglite,
+               # stargazer,
+               # svglite,
                Cairo,
                magrittr,
                gghighlight,
                flexdashboard,
                ggrepel,
                lubridate,
-               RColorBrewer,
-               rJava,
-               dygraphs)
+               RColorBrewer
+               # rJava,
+               # dygraphs
+               )
 
 # pacman::p_load(plotly, ggpubr, lubridate, shiny, flexdashboard)
 
@@ -62,132 +61,150 @@ set.seed(1234)
 
 ```
 
-Compare
+Proteins
 =======================================================================
 
-Row  {data-height=600}
+Sidebar {.sidebar}
 -----------------------------------------------------------------------
 
 ```{r}
 
+pickerInput("Factor1", "Factor",
+             choices  = colnames(adm_all %>% select(ct:CRE)),
+             selected = "ct",
+             options  = list(`actions-box` = TRUE), multiple = F
+             )
 
-  # ui = fillPage(
+pickerInput("Factor2", "Factor 2 (Scatter y-axis)",
+             choices  = colnames(adm_all %>% select(ct:CRE)),
+             selected = "PAI1",
+             options  = list(`actions-box` = TRUE), multiple = F
+             )
 
-    
-    sidebarPanel(
-      # width = 3,
-        pickerInput("Factor1", "Factor 1 (x-axis)",
-                     choices  = colnames(adm_all %>% select(ct:CRE)),
-                     selected = "ct",
-                     options  = list(`actions-box` = TRUE), multiple = F
-                     ),
+radioButtons("Color", "Color",
+         choices  = colnames(metaPatients)[-c(1,4)],
+         selected = "Outcome")
 
-         pickerInput("Factor2", "Factor 2 (y-axis)",
-                     choices  = colnames(adm_all %>% select(ct:CRE)),
-                     selected = "PAI1",
-                     options  = list(`actions-box` = TRUE), multiple = F
-                     ),
-        
-        radioButtons("Color", "Color",
-                 choices  = colnames(metaPatients)[-c(1,4)],
-                 selected = "Outcome")
-      )#,
-    
-# 
-#     mainPanel(
-#       tabsetPanel(
-#         tabPanel( ("Scatter"),
-#                   plotlyOutput("scatterPlot")
-#                   ),
-# 
-#         tabPanel( ("Box Plots"),
-#                   plotlyOutput("single.box.plot")
-#                   ), 
-#         tabPanel( ("Stats"),
-#                   plotOutput("single.box.stats")
-#                   )
-#         
-#         )
-# 
-#       )
-   # )
-
-  
-  # 
-  # server <- function(input, output, session) {
-  # 
-  # 
-  #   output$scatterPlot <- 
-    renderPlotly({
-    
-      adm_all %>% left_join(metaPatients %>% select(-Outcome, -Age), 
-                            by = "id") %>%
-        ggplot(aes_string(x=input$Factor1, y = input$Factor2)) +
-        scale_x_log10() + scale_y_log10() +
-        geom_point(aes_string(color=input$Color))
-    })
-  
-
-  # }
-  # 
-  # shinyApp(ui, server)
+radioButtons("Pos", "Bar Position",
+                 choices = c("stack", "dodge"), 
+                 selected = "dodge")
 
 ```
 
-Row {.tabset .tabset-fade data-height=600}
+
+
+Row  {.tabset .tabset-fade}
 -----------------------------------------------------------------------
 
-### Boxplots
+### Histogram
+
+```{r fig.width=1200}
+
+
+adm <- adm_all %>% left_join(metaPatients %>% select(-Outcome, -Age), 
+                          by = "id")
+
+mainPanel(
+  
+  renderPlotly({
+      
+      ggplot(adm, aes_string(x=input$Factor1)) +
+        scale_x_log10() + scale_y_log10() +
+        geom_histogram(aes_string(fill=input$Color),
+            position = input$Pos)
+      
+    }),
+    
+    renderPlotly({
+      
+      ggplot(adm, aes_string(x=input$Factor2)) +
+        scale_x_log10() + scale_y_log10() +
+        geom_histogram(aes_string(fill=input$Color),
+            position = input$Pos)
+      
+  })
+  
+)
+
+
+
+```
+
+
+### Scatter
+
+```{r}
+
+  
+  renderPlotly({
+    
+    ggplot(adm, aes_string(x=input$Factor1, y = input$Factor2)) +
+      scale_x_log10() + scale_y_log10() +
+      geom_point(aes_string(color=input$Color))
+    
+  })
+```
+
+
+### Interactive Boxplots
 
 ```{r}
 
 
 box.select <- reactive ({
+
   box.data  %>%
-    dplyr::filter(Factor %in% c(input$Factor1, input$Factor2)) %>%
+    dplyr::filter(Factor %in% c(input$Factor1)) %>%
     as.data.frame() %>%
-    ggboxplot(x="Outcome", 
-                y = "Value",
-                color="Outcome",
-                palette = c("red", "blue", "green4", "purple")) +
-      scale_x_discrete(labels=c("F", "S", "OFI", "HC")) +
-      scale_y_log10() +
-      facet_wrap("Name_Units", scales = "free", ncol=2) +
-      # ylab(get.pretty.factor(c(input$Factor1, input$Factor2))) +
-      theme(text = element_text(size=24),
-            plot.title = element_text(hjust = .5),
-            panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank(),
-            panel.spacing = unit(1.25, "lines"),
-            axis.title.x = element_blank(),
-            axis.text = element_text(size = 20),
-            axis.title.y = element_blank(),
-            legend.position = "none",
-            strip.background = element_blank(),
-            strip.placement = "outside")
+    ggplot(aes(x=Outcome, y = Value)) +
+    geom_boxplot()  +
+    scale_x_discrete(labels=c("F", "S", "OFI", "HC")) +
+    scale_y_log10() +
+    theme(#text = element_text(size=24),
+          plot.title = element_text(hjust = .5),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.spacing = unit(1.25, "lines"),
+          axis.title.x = element_blank(),
+          text = element_text(size = 20),
+          axis.title.y = element_blank(),
+          legend.title = element_blank()
+          )
 })
 
 
-# output$single.box.plot <-
-renderPlotly({
-    box.select()
-})
+# renderDataTable(
+#   box.select() 
+# )
+# 
+# renderPlotly({
+#     box.select()
+# })
  
-
+renderPlotly({
+    box.select()+
+    geom_point(aes_string(fill=input$Color), size=2.5, 
+               alpha = .7,
+               position = position_jitterdodge())
+})
 ```
 
-### Stats
+### Statstics
 
 ```{r}
    # output$single.box.stats <-
     renderPlot({
-        box.select() + stat_compare_means(comparisons = my_comparisons,
-                             # size=4,
+        box.select() + 
+        aes(color=Outcome)+
+        stat_compare_means(comparisons = my_comparisons,
+                             size=4,
                              label = "p.signif",
                              method = "wilcox.test")
     })
 
 ```
+
+
 
 ROC Curves
 =======================================================================
@@ -200,14 +217,14 @@ Row {data-width=350}
 sidebarPanel(selectizeInput("Plot1", "Plot 1",
              choices  = colnames(adm_all %>% select(TNFa:RANTES)),
              selected = "PAI1",
-             options  = list(`actions-box` = TRUE), 
+             options  = list(`actions-box` = TRUE),
              multiple = T
              ),
-             
+
           selectizeInput("Plot2", "Plot 2",
              choices  = colnames(adm_all %>% select(TNFa:RANTES)),
              selected = "TM",
-             options  = list(`actions-box` = TRUE), 
+             options  = list(`actions-box` = TRUE),
              multiple = T
              ))
 
@@ -215,33 +232,33 @@ f <- glmFits(adm_all, cytokines = cytokines) %>%
   rocFits(.)
 names(f) <- cytokines
 
-
-renderPlotly({
-    pROC::ggroc(f[input$Plot1])+
-        coord_fixed() +
-        scale_color_lancet(labels=get.pretty.name(input$Plot1))+
-        theme_pubr() +
-        theme(legend.position = c(0.65, 0.4),
-              legend.text = element_text(size = 12),
-              legend.title = element_blank()) 
-})
-
-renderPlotly({
-    pROC::ggroc(f[input$Plot2])+
-        coord_fixed() +
-        scale_color_lancet(labels=get.pretty.name(input$Plot2))+
-        theme_pubr() +
-        theme(legend.position = c(0.65, 0.4),
-              legend.text = element_text(size = 12),
-              legend.title = element_blank()) 
-})
-
+mainPanel(
+  renderPlotly({
+      pROC::ggroc(f[input$Plot1])+
+          coord_fixed() +
+          scale_color_lancet(labels=get.pretty.name(input$Plot1))+
+          theme_pubr() +
+          theme(legend.position = c(0.65, 0.4),
+                legend.text = element_text(size = 12),
+                legend.title = element_blank()) 
+  }),
+  
+  renderPlotly({
+      pROC::ggroc(f[input$Plot2])+
+          coord_fixed() +
+          scale_color_lancet(labels=get.pretty.name(input$Plot2))+
+          theme_pubr() +
+          theme(legend.position = c(0.65, 0.4),
+                legend.text = element_text(size = 12),
+                legend.title = element_blank()) 
+  })
+)
 ```
 
 Demographics
 =======================================================================
 
-Column {data-width=350 }
+Column 
 -----------------------------------------------------------------------
 
 ```{r}

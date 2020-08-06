@@ -38,3 +38,24 @@ dims_umap <- adm.umap$layout %>%
     cbind(Outcome = adm_all_mat$Outcome)
 
 ggplot(dims_umap, aes(UMAP1, UMAP2, color=Outcome)) + geom_point()
+
+
+
+box.data %>% filter(Factor %in% c("PAI1")) %>%
+ggplot(aes(x=Outcome, y = Value)) +
+    geom_boxplot() +
+    geom_point(aes(color=AgeBin), size=5, position = position_jitterdodge()) +
+    scale_x_discrete(labels=c("F", "S", "OFI", "HC")) +
+    scale_y_log10() +
+    theme(text = element_text(size=24),
+          plot.title = element_text(hjust = .5),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.spacing = unit(1.25, "lines"),
+          axis.title.x = element_blank(),
+          axis.text = element_text(size = 20),
+          axis.title.y = element_blank()
+          )
+
+
+

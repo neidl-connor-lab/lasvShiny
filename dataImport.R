@@ -134,16 +134,18 @@ cytoColMax <- cyto_all_patients_dpi_corrected %>%
 box.data <- cyto_all_patients_dpi_corrected %>%
     filter(Outcome=="Healthy Control" | (Outcome=="Other Febrile Illness" & dpi==0)) %>%
     ungroup() %>%
-    select(Outcome, ct, !!cytokines, !!clin.chem) %>%
-    rbind(select(adm_all, Outcome, ct, !!cytokines, !!clin.chem)) %>%
-    gather(key = "Factor", value = "Value", -Outcome) %>%
+    select(id, Outcome, ct, !!cytokines, !!clin.chem) %>%
+    rbind(select(adm_all, id, Outcome, ct, !!cytokines, !!clin.chem)) %>%
+    gather(key = "Factor", value = "Value", -id, -Outcome) %>%
     left_join(cytoColMax, by="Factor")%>%
     filter(!is.na(Value)) %>%
     mutate(Name = get.pretty.name(Factor),
            Units = get.pretty.units(Factor),
            Name_Units = get.pretty.factor(Factor),
            Outcome = factor(Outcome, levels = c("Fatal", "Survivor", "Other Febrile Illness", "Healthy Control"))) %>%
-    mutate_if(is.numeric, round, 2)
+    mutate_if(is.numeric, round, 2)%>%
+    left_join(metaPatients %>% select(-Outcome, -Age),
+              by = "id")
 
 #https://stackoverflow.com/questions/6461209/how-to-round-up-to-the-nearest-10-or-100-or-x
 roundUpNice <- function(x, nice=c(1,2,4,5,6,8,10)) {
