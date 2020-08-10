@@ -287,18 +287,17 @@ sidebarPanel(radioButtons("Group", h4("Group by (x-axis)"),
 
 # for everything but Age, need 'stat = "count"' in histogram
 # for Age, need the binwidth
-
-renderPlotly({
+mainPanel(
+  renderPlotly({
     metaPatients %>%
         ggplot(aes_string(x=input$Group, fill=input$Fill)) +
         geom_histogram(
             # binwidth = as.numeric(input$ageBins), 
             stat = "count",
-            position = input$Pos
-                       ) +
+            position = input$Pos) +
         theme_pubr() 
 })
-
+)
 
 
 ```
