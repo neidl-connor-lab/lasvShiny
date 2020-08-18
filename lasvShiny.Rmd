@@ -3,10 +3,11 @@ title: "LASV Bioplex Analysis"
 runtime: shiny
 output: 
   flexdashboard::flex_dashboard:
-    orientation: rows
+    orientation: columns
     source_code: https://github.com/neidl-connor-lab/lasvShiny
     theme: flatly 
     vertical_layout: fill
+
 
 
 --- 
@@ -59,24 +60,25 @@ options(scipen = 999)
 set.seed(1234)
 
 
+adm <- adm_all %>% left_join(metaPatients %>% select(-Outcome, -Age), 
+                          by = "id")
+
 ```
 
-Proteins
-=======================================================================
 
 Sidebar {.sidebar}
------------------------------------------------------------------------
+====================
 
 ```{r}
 
 pickerInput("Factor1", "Factor",
-             choices  = colnames(adm_all %>% select(ct:CRE)),
+             choices  = levels(factor(box.data$Factor)), #colnames(adm_all %>% select(ct:CRE)),
              selected = "ct",
              options  = list(`actions-box` = TRUE), multiple = F
              )
 
 pickerInput("Factor2", "Factor 2 (Scatter y-axis)",
-             choices  = colnames(adm_all %>% select(ct:CRE)),
+             choices  = levels(factor(box.data$Factor)), #colnames(adm_all %>% select(ct:CRE)),
              selected = "PAI1",
              options  = list(`actions-box` = TRUE), multiple = F
              )
@@ -85,42 +87,99 @@ radioButtons("Color", "Color",
          choices  = colnames(metaPatients)[-c(1,4)],
          selected = "Outcome")
 
-radioButtons("Pos", "Bar Position",
-                 choices = c("stack", "dodge"), 
-                 selected = "dodge")
+# radioButtons("Pos", "Bar Position",
+#                  choices = c("stack", "dodge"), 
+#                  selected = "stack")
 
 ```
 
+Demographics
+=======================================================================
 
-
-Row  {.tabset .tabset-fade}
+Column 
 -----------------------------------------------------------------------
 
-### Histogram
+```{r}
 
-```{r fig.width=1200}
+# not allowing for id or Age as choices
 
-
-adm <- adm_all %>% left_join(metaPatients %>% select(-Outcome, -Age), 
-                          by = "id")
+radioButtons("Group", h4("Group by (x-axis)"),
+             choices  = colnames(metaPatients)[-c(1,4)],
+             selected = "Dataset", inline = T
+             )
+    
+radioButtons("PosDem", h4("Bar Position"),
+             choices = c("stack", "dodge"), 
+             selected = "stack", inline = T
+             )
 
 mainPanel(
+  renderPlotly(
+    metaPatients %>%
+      
+        ggplot(aes_string(x=input$Group, fill=input$Color)) +
+      
+        geom_bar(
+            # binwidth = as.numeric(input$ageBins), 
+            stat = "count",
+            position = input$PosDem, width = 0.7) +
+        theme_pubr() 
+  ),
+  
+  renderPlotly(
+    metaPatients %>%
+      
+        ggplot(aes_string(x=input$Group, fill=input$Color)) +
+      
+        geom_bar(aes(y = (..count..)/sum(..count..)), 
+                 stat="count",
+                 position = input$PosDem, width = 0.7) + 
+        scale_y_continuous(labels=scales::percent) +
+        ylab("relative frequencies")+
+        theme_pubr() 
+  )
+)
+
+
+```
+
+Proteins
+=======================================================================
+
+Column  {.tabset .tabset-fade data-height=300}
+-----------------------------------------------------------------------
+
+### Density
+
+```{r}
+
+
+
+p <-  function(f) {
+  box.data %>% filter(Factor %in% c(f)) %>%
+    ggplot(aes_string(x="Value", fill=input$Color)) +
+      scale_x_log10() + 
+      geom_density(alpha=0.6)+
+      ggtitle(get.pretty.name(f)) +
+      xlab(get.pretty.units(f)) +
+      theme_pubr() 
+  
+  } %>% ggplotly(height = 300, width = 600) 
+
+shiny::fluidRow(
   
   renderPlotly({
       
-      ggplot(adm, aes_string(x=input$Factor1)) +
-        scale_x_log10() + scale_y_log10() +
-        geom_histogram(aes_string(fill=input$Color),
-            position = input$Pos)
+    p(input$Factor1)  
       
-    }),
+  })
+)
     
-    renderPlotly({
+fluidRow(
+  
+  renderPlotly({
       
-      ggplot(adm, aes_string(x=input$Factor2)) +
-        scale_x_log10() + scale_y_log10() +
-        geom_histogram(aes_string(fill=input$Color),
-            position = input$Pos)
+    p(input$Factor2) #%>% ggplotly(height = 300, width = 600)
       
   })
   
@@ -135,14 +194,30 @@ mainPanel(
 
 ```{r}
 
+
+
+s <- function(c){ 
+  pre.box.data %>%
+    
+  ggplot(aes_string(x=input$Factor1, y = input$Factor2)) +
+    scale_x_log10() + scale_y_log10() +
+    geom_point(aes_string(color=input$Color, shape="Outcome")) +
+    # theme_pubr() +
+    ggtitle("Two Factor Scatter Plot") +
+    xlab(get.pretty.factor(input$Factor1))+
+    ylab(get.pretty.factor(input$Factor2)) +
+    theme(text = element_text(size = 14))
   
-  renderPlotly({
-    
-    ggplot(adm, aes_string(x=input$Factor1, y = input$Factor2)) +
-      scale_x_log10() + scale_y_log10() +
-      geom_point(aes_string(color=input$Color))
-    
-  })
+  }  %>% ggplotly(height = 600, width = 800) %>%
+  style(traces = c("3"))
+  
+
+
+renderPlotly({
+  
+  s(input$Color)
+  
+})
 ```
 
 
@@ -151,153 +226,148 @@ mainPanel(
 ```{r}
 
 
-box.select <- reactive ({
-
-  box.data  %>%
-    dplyr::filter(Factor %in% c(input$Factor1)) %>%
-    as.data.frame() %>%
-    ggplot(aes(x=Outcome, y = Value)) +
-    geom_boxplot()  +
-    scale_x_discrete(labels=c("F", "S", "OFI", "HC")) +
-    scale_y_log10() +
-    theme(#text = element_text(size=24),
-          plot.title = element_text(hjust = .5),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          panel.spacing = unit(1.25, "lines"),
-          axis.title.x = element_blank(),
-          text = element_text(size = 20),
-          axis.title.y = element_blank(),
-          legend.title = element_blank()
-          )
-})
-
-
-# renderDataTable(
-#   box.select() 
-# )
-# 
-# renderPlotly({
-#     box.select()
+# box.select <- reactive ({
+#   box.data  %>%
+#     dplyr::filter(Factor %in% c(input$Factor1)) %>%
+#     as.data.frame() %>% return()
 # })
- 
+
+# box.data %>% filter(Factor=="ct", Value > 36) %>% arrange(Value)
+
+b <- function(f, c) {
+  box.data  %>%
+    dplyr::filter(Factor == (f)) %>%
+    as.data.frame() %>%
+    
+    ggplot(aes(x=Outcome, y = Value)) +
+
+      scale_x_discrete(labels=c("F", "S", "OFI", "HC")) +
+      scale_y_log10() + 
+
+      theme(
+            plot.title = element_text(hjust = .5),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            panel.spacing = unit(1.25, "lines"),
+            text = element_text(size = 14)
+            # axis.title.x = element_blank(),
+            # axis.title.y = element_blank(),
+            # legend.title = element_blank()
+            )+
+      # geom_point(aes_string(fill=c), alpha=0.75, outlier.shape=NA,
+      #            shape=21, 
+      #            size=2.5, 
+      #            position = position_jitterdodge()
+      #          ) +
+      ggtitle(get.pretty.name(f)) +      
+      geom_boxplot(outlier.color = NA,
+                   outlier.size = 0,
+                   outlier.shape = NA)  +
+      geom_jitter(position = position_jitterdodge(), 
+                  aes_string(fill=c), 
+                  alpha=0.75,
+                  shape=21,
+                  size=2.5) +
+      # theme_pubr() +
+      ylab(get.pretty.units(f)) +
+    xlab("Outcome")
+} 
+
+
+
 renderPlotly({
-    box.select()+
-    geom_point(aes_string(fill=input$Color), size=2.5, 
-               alpha = .7,
-               position = position_jitterdodge())
+
+    b(input$Factor1, input$Color)%>% ggplotly(height = 500, width = 700, ) 
+  
 })
 ```
 
-### Statstics
+### Statistics
 
 ```{r}
-   # output$single.box.stats <-
-    renderPlot({
-        box.select() + 
-        aes(color=Outcome)+
-        stat_compare_means(comparisons = my_comparisons,
-                             size=4,
-                             label = "p.signif",
-                             method = "wilcox.test")
-    })
 
+renderPlot({
+  # box.select() + 
+  b(input$Factor1, input$Color) + 
+  # theme_update(text = element_text(size = 20)) +
+  # geom_point(aes_string(color=input$Color), size=2.5, 
+  #        alpha = .7,
+  #        position = position_jitterdodge()) +
+  # aes(color=input$Color)+
+  stat_compare_means(comparisons = my_comparisons,
+                       size=4,
+                       label = "p.signif",
+                       method = "wilcox.test") 
+    
+})
+
+### Not working... download file
+# 
+# (downloadHandler(
+#     filename = function(){paste(input$dataset, '.pdf', sep = '')},
+# 
+#     content = function(file){
+#       cairo_pdf(filename = file,
+#                 width = 18, height = 10, pointsize = 12, family = "sans", bg = "transparent",
+#                 antialias = "subpixel",fallback_resolution = 300)
+#       plot(boxstats)
+#       dev.off()
+#     }
+# ))
 ```
 
 
-
-ROC Curves
-=======================================================================
-
-Row {data-width=350}
------------------------------------------------------------------------
+### ROC Curves
 
 ```{r}
+cytokines = colnames(adm %>% select(ct:RANTES))
 
-sidebarPanel(selectizeInput("Plot1", "Plot 1",
-             choices  = colnames(adm_all %>% select(TNFa:RANTES)),
-             selected = "PAI1",
+
+selectizeInput("Factor3", "Factor(s)",
+             choices  = cytokines,
+             # selected = c("TM", "IL8", "DDIMER"),
              options  = list(`actions-box` = TRUE),
              multiple = T
-             ),
+             )
+             
 
-          selectizeInput("Plot2", "Plot 2",
-             choices  = colnames(adm_all %>% select(TNFa:RANTES)),
-             selected = "TM",
-             options  = list(`actions-box` = TRUE),
-             multiple = T
-             ))
 
-f <- glmFits(adm_all, cytokines = cytokines) %>% 
-  rocFits(.)
-names(f) <- cytokines
 
-mainPanel(
-  renderPlotly({
-      pROC::ggroc(f[input$Plot1])+
+glmDat <- glmFits(adm, cytokines)
+
+glmCo <- glmDat %>% 
+  glmCoefs(cytokines)
+
+rocData <- glmDat %>% 
+  rocFits(cytokines)
+
+names(rocData) <- cytokines
+
+
+rocRes <- rocCoords(rocFits = rocData, glmCoefs = glmCo, cytokines)
+
+r <- function(f){
+  pROC::ggroc(rocData[f])+
           coord_fixed() +
-          scale_color_lancet(labels=get.pretty.name(input$Plot1))+
+          scale_fill_discrete(labels=c(get.pretty.name(f)))+
           theme_pubr() +
           theme(legend.position = c(0.65, 0.4),
                 legend.text = element_text(size = 12),
                 legend.title = element_blank()) 
+    # geom_point(aes(x = rocRes$specificity[f], y =rocRes$sensitivity[f]))
+  } %>% ggplotly(height = 400, width = 600) #%>% layout(height = 400, width = 600)
+
+
+mainPanel(
+  renderPlotly({
+    
+    r(c(input$Factor1, input$Factor3))
+    
   }),
   
-  renderPlotly({
-      pROC::ggroc(f[input$Plot2])+
-          coord_fixed() +
-          scale_color_lancet(labels=get.pretty.name(input$Plot2))+
-          theme_pubr() +
-          theme(legend.position = c(0.65, 0.4),
-                legend.text = element_text(size = 12),
-                legend.title = element_blank()) 
-  })
+ 
 )
 ```
 
-Demographics
-=======================================================================
-
-Column 
------------------------------------------------------------------------
-
-```{r}
-
-# not allowing for id or Age as choices
-
-sidebarPanel(radioButtons("Group", h4("Group by (x-axis)"),
-             choices  = colnames(metaPatients)[-c(1,4)],
-             selected = "Dataset"
-             ),
-    
-    radioButtons("Fill", h4("Color"),
-                 choices  = colnames(metaPatients)[-c(1,4)],
-                 selected = "Outcome"
-                 ),
-    
-    radioButtons("Pos", h4("Bar Position"),
-                 choices = c("stack", "dodge"), 
-                 selected = "dodge")
-#     , 
-#     
-#     sliderInput("ageBins", "Bins (age groups)", value = 5,
-#                 min = 1, max = 20)
-)
 
 
-# for everything but Age, need 'stat = "count"' in histogram
-# for Age, need the binwidth
-mainPanel(
-  renderPlotly({
-    metaPatients %>%
-        ggplot(aes_string(x=input$Group, fill=input$Fill)) +
-        geom_histogram(
-            # binwidth = as.numeric(input$ageBins), 
-            stat = "count",
-            position = input$Pos) +
-        theme_pubr() 
-})
-)
-
-
-```

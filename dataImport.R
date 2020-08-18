@@ -131,21 +131,44 @@ cytoColMax <- cyto_all_patients_dpi_corrected %>%
     set_colnames(c("Factor", "Max"))
 
 
-box.data <- cyto_all_patients_dpi_corrected %>%
+# Old -------
+# box.data <- cyto_all_patients_dpi_corrected %>%
+#     filter(Outcome=="Healthy Control" | (Outcome=="Other Febrile Illness" & dpi==0)) %>%
+#     ungroup() %>%
+#     select(id, Outcome, ct, !!cytokines, !!clin.chem) %>%
+#     rbind(select(adm_all, id, Outcome, ct, !!cytokines, !!clin.chem)) %>%
+#     gather(key = "Factor", value = "Value", -id, -Outcome) %>%
+#     left_join(cytoColMax, by="Factor")%>%
+#     filter(!is.na(Value)) %>%
+#     mutate(Name = get.pretty.name(Factor),
+#            Units = get.pretty.units(Factor),
+#            Name_Units = get.pretty.factor(Factor),
+#            Outcome = factor(Outcome, levels = c("Fatal", "Survivor", "Other Febrile Illness", "Healthy Control"))) %>%
+#     mutate_if(is.numeric, round, 2)%>%
+#     left_join(metaPatients %>% select(-Outcome, -Age),
+#               by = "id")
+
+pre.box.data <- cyto_all_patients_dpi_corrected %>%
     filter(Outcome=="Healthy Control" | (Outcome=="Other Febrile Illness" & dpi==0)) %>%
     ungroup() %>%
     select(id, Outcome, ct, !!cytokines, !!clin.chem) %>%
     rbind(select(adm_all, id, Outcome, ct, !!cytokines, !!clin.chem)) %>%
-    gather(key = "Factor", value = "Value", -id, -Outcome) %>%
-    left_join(cytoColMax, by="Factor")%>%
+    mutate_if(is.numeric, round, 2)%>%
+    left_join(metaPatients %>% select(-Outcome, -Age), by = "id")
+
+box.data <- pre.box.data %>% gather(key = "Factor", value = "Value",
+                                    -id, -Outcome, -Dataset, -Sex, -State, -AgeBin) %>%
+
     filter(!is.na(Value)) %>%
+    left_join(cytoColMax, by="Factor")%>%
     mutate(Name = get.pretty.name(Factor),
            Units = get.pretty.units(Factor),
            Name_Units = get.pretty.factor(Factor),
-           Outcome = factor(Outcome, levels = c("Fatal", "Survivor", "Other Febrile Illness", "Healthy Control"))) %>%
-    mutate_if(is.numeric, round, 2)%>%
-    left_join(metaPatients %>% select(-Outcome, -Age),
-              by = "id")
+           Outcome = factor(Outcome,
+                            levels = c("Fatal", "Survivor",
+                                    "Other Febrile Illness", "Healthy Control")))
+
+# box.data %>% spread(key = "Factor", value = "Value") -> box.data.all
 
 #https://stackoverflow.com/questions/6461209/how-to-round-up-to-the-nearest-10-or-100-or-x
 roundUpNice <- function(x, nice=c(1,2,4,5,6,8,10)) {
