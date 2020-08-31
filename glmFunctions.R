@@ -154,7 +154,19 @@ stat.table <- function(df, cytokines) {
 
 colMax <- function(cytoData) sapply(cytoData, max, na.rm = TRUE)
 
+cyto.corr <- function(cases, rects) {
+    correlations <- abs(cor(cases, method = "pearson", use = "complete.obs"))
 
+    corrplot(correlations,
+             cl.lim=c(0,max(correlations)),
+             method="circle",
+             order = "hclust",
+             hclust.method = "complete",
+             tl.col="black",
+             tl.srt=45,
+             addrect = rects,
+             is.corr=FALSE)
+}
 
 
 ###-----Modeling----

@@ -6,7 +6,7 @@ source("glmFunctions.R")
 cytokines <- c("TNFa", "sTNFRI", "sTNFRII", "sCD40L", "sFAS",
                "AntithrombinIII", "DDIMER",  "Fibrinogen", "PAI1", "TM", "tPA", "vWF",
                "EGF", "Pecam1", "sESelectin", "PSELECTIN", "siCAM1", "sVCAM1", "SAANG", "VEGF",
-               "CFH",  "CRP", "GMCSF", "aHMCSF", "FRACTALINE",  "GRO", "IFNa2", "IFNy",
+               "CFH",  "CRP", "GMCSF", "aHMCSF", "GRO", "IFNa2", "IFNy",
                "IL1RA", "sIL2Ra", "IL6", "IL8", "IL10", "IP10",
                "MCP1", "MCP2", "MCP3", "MIP1a", "MIP1b", "RANTES")
 
@@ -169,6 +169,11 @@ box.data <- pre.box.data %>% gather(key = "Factor", value = "Value",
                                     "Other Febrile Illness", "Healthy Control")))
 
 # box.data %>% spread(key = "Factor", value = "Value") -> box.data.all
+
+
+
+adm <- adm_all %>% left_join(metaPatients %>% select(-Outcome, -Age),
+                             by = "id")
 
 #https://stackoverflow.com/questions/6461209/how-to-round-up-to-the-nearest-10-or-100-or-x
 roundUpNice <- function(x, nice=c(1,2,4,5,6,8,10)) {

@@ -60,9 +60,6 @@ options(scipen = 999)
 set.seed(1234)
 
 
-adm <- adm_all %>% left_join(metaPatients %>% select(-Outcome, -Age), 
-                          by = "id")
-
 ```
 
 
@@ -201,15 +198,14 @@ s <- function(c){
     
   ggplot(aes_string(x=input$Factor1, y = input$Factor2)) +
     scale_x_log10() + scale_y_log10() +
-    geom_point(aes_string(color=input$Color, shape="Outcome")) +
+    geom_point(aes_string(color=input$Color)) +
     # theme_pubr() +
     ggtitle("Two Factor Scatter Plot") +
     xlab(get.pretty.factor(input$Factor1))+
     ylab(get.pretty.factor(input$Factor2)) +
     theme(text = element_text(size = 14))
   
-  }  %>% ggplotly(height = 600, width = 800) %>%
-  style(traces = c("3"))
+  }  %>% ggplotly(height = 600, width = 800)
   
 
 
@@ -370,4 +366,10 @@ mainPanel(
 ```
 
 
+```{r}
+
+
+
+
+```
 
