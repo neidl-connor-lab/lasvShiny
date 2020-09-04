@@ -17,10 +17,7 @@ output:
 ###-----Load Packages----
 
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(yaml,
-               knitr,
-               markdown,
-               shiny,
+pacman::p_load(shiny,
                shinyWidgets,
                devtools,
                ggplot2,
@@ -28,32 +25,21 @@ pacman::p_load(yaml,
                statmod,
                tidyverse,
                pROC,
-               # sqldf,
                corrplot,
                readxl,
                hablar,
                ggpubr,
                patchwork,
-               # tidyr,
-               # dplyr,
                plotly,
                DT,
-               # tiff,
                ggsci,
-               # stargazer,
-               # svglite,
                Cairo,
                magrittr,
                gghighlight,
                flexdashboard,
-               ggrepel,
                lubridate,
                RColorBrewer
-               # rJava,
-               # dygraphs
                )
-
-# pacman::p_load(plotly, ggpubr, lubridate, shiny, flexdashboard)
 
 source("dataImport.R")
 options(scipen = 999)
@@ -68,25 +54,22 @@ Sidebar {.sidebar}
 
 ```{r}
 
-pickerInput("Factor1", "Factor",
-             choices  = levels(factor(box.data$Factor)), #colnames(adm_all %>% select(ct:CRE)),
+pickerInput("Factor1", h4("Factor"),
+             choices  = levels(factor(box.data$Factor)), 
              selected = "ct",
              options  = list(`actions-box` = TRUE), multiple = F
              )
 
-pickerInput("Factor2", "Factor 2 (Scatter y-axis)",
-             choices  = levels(factor(box.data$Factor)), #colnames(adm_all %>% select(ct:CRE)),
+pickerInput("Factor2", h4("Factor 2 (Scatter y-axis)"),
+             choices  = levels(factor(box.data$Factor)), 
              selected = "PAI1",
              options  = list(`actions-box` = TRUE), multiple = F
              )
 
-radioButtons("Color", "Color",
+radioButtons("Color", h4("Color"),
          choices  = colnames(metaPatients)[-c(1,4)],
          selected = "Outcome")
 
-# radioButtons("Pos", "Bar Position",
-#                  choices = c("stack", "dodge"), 
-#                  selected = "stack")
 
 ```
 
@@ -96,9 +79,34 @@ Demographics
 Column 
 -----------------------------------------------------------------------
 
-```{r}
+#### Demographic Data
 
-# not allowing for id or Age as choices
+<button class="btn btn-primary" data-toggle="collapse" data-target="#BlockName"> Show/Hide </button>  
+<div id="BlockName" class="collapse">  
+
+*Datasets:*
+
+* Participants were divided into two datasets for statistical analysis: 
+  + a **Primary** dataset (samples taken January 2014 through April 2016), and 
+  + a **Secondary** dataset (samples taken May 2016 through April 2017). 
+  
+*Outcome groups:*
+
+* Patients who tested positive for LASV had their outcome recorded: 
+  1. **(F)atal** or 
+  2. **(S)urvivor**
+* Two control groups:
+  3. Patients who tested negative for LASV but had a fever (**Other Febrile Illness/OFI**)
+  4. Healthy volunteers from Nigeria and Europe (**Healthy Controls/HC**)
+
+*Other demographic data:*
+
+1. Sex (Male/Female/Unknown)
+2. Place of origin within Nigeria (State)
+3. Age (in bins of 20 years)
+
+<br>
+```{r}
 
 radioButtons("Group", h4("Group by (x-axis)"),
              choices  = colnames(metaPatients)[-c(1,4)],
@@ -117,7 +125,6 @@ mainPanel(
         ggplot(aes_string(x=input$Group, fill=input$Color)) +
       
         geom_bar(
-            # binwidth = as.numeric(input$ageBins), 
             stat = "count",
             position = input$PosDem, width = 0.7) +
         theme_pubr() 
@@ -149,8 +156,6 @@ Column  {.tabset .tabset-fade data-height=300}
 ### Density
 
 ```{r}
-
-
 
 p <-  function(f) {
   box.data %>% filter(Factor %in% c(f)) %>%
@@ -199,7 +204,6 @@ s <- function(c){
   ggplot(aes_string(x=input$Factor1, y = input$Factor2)) +
     scale_x_log10() + scale_y_log10() +
     geom_point(aes_string(color=input$Color)) +
-    # theme_pubr() +
     ggtitle("Two Factor Scatter Plot") +
     xlab(get.pretty.factor(input$Factor1))+
     ylab(get.pretty.factor(input$Factor2)) +
@@ -222,14 +226,6 @@ renderPlotly({
 ```{r}
 
 
-# box.select <- reactive ({
-#   box.data  %>%
-#     dplyr::filter(Factor %in% c(input$Factor1)) %>%
-#     as.data.frame() %>% return()
-# })
-
-# box.data %>% filter(Factor=="ct", Value > 36) %>% arrange(Value)
-
 b <- function(f, c) {
   box.data  %>%
     dplyr::filter(Factor == (f)) %>%
@@ -246,15 +242,9 @@ b <- function(f, c) {
             panel.grid.minor = element_blank(),
             panel.spacing = unit(1.25, "lines"),
             text = element_text(size = 14)
-            # axis.title.x = element_blank(),
-            # axis.title.y = element_blank(),
-            # legend.title = element_blank()
+
             )+
-      # geom_point(aes_string(fill=c), alpha=0.75, outlier.shape=NA,
-      #            shape=21, 
-      #            size=2.5, 
-      #            position = position_jitterdodge()
-      #          ) +
+
       ggtitle(get.pretty.name(f)) +      
       geom_boxplot(outlier.color = NA,
                    outlier.size = 0,
@@ -283,33 +273,17 @@ renderPlotly({
 ```{r}
 
 renderPlot({
-  # box.select() + 
+
   b(input$Factor1, input$Color) + 
-  # theme_update(text = element_text(size = 20)) +
-  # geom_point(aes_string(color=input$Color), size=2.5, 
-  #        alpha = .7,
-  #        position = position_jitterdodge()) +
-  # aes(color=input$Color)+
-  stat_compare_means(comparisons = my_comparisons,
+
+    stat_compare_means(comparisons = my_comparisons,
                        size=4,
                        label = "p.signif",
                        method = "wilcox.test") 
     
 })
 
-### Not working... download file
-# 
-# (downloadHandler(
-#     filename = function(){paste(input$dataset, '.pdf', sep = '')},
-# 
-#     content = function(file){
-#       cairo_pdf(filename = file,
-#                 width = 18, height = 10, pointsize = 12, family = "sans", bg = "transparent",
-#                 antialias = "subpixel",fallback_resolution = 300)
-#       plot(boxstats)
-#       dev.off()
-#     }
-# ))
+
 ```
 
 
@@ -359,17 +333,9 @@ mainPanel(
     
     r(c(input$Factor1, input$Factor3))
     
-  }),
+  })
   
  
 )
-```
-
-
-```{r}
-
-
-
-
 ```
 
