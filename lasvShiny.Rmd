@@ -81,8 +81,8 @@ Column
 
 #### Demographic Data
 
-<button class="btn btn-primary" data-toggle="collapse" data-target="#BlockName"> Show/Hide </button>  
-<div id="BlockName" class="collapse">  
+<!-- <button class="btn btn-primary" data-toggle="collapse" data-target="#BlockName"> Show/Hide </button>   -->
+<!-- <div id="BlockName" class="collapse">   -->
 
 *Datasets:*
 
