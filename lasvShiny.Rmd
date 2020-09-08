@@ -105,7 +105,6 @@ Column
 2. Place of origin within Nigeria (State)
 3. Age (in bins of 20 years)
 
-<br>
 ```{r}
 
 radioButtons("Group", h4("Group by (x-axis)"),
@@ -289,11 +288,12 @@ renderPlot({
 
 ### ROC Curves
 
+*Note, ROC curves not yet available in this app for clinical parameters (AST, ALT, BUN, CRE).*
 ```{r}
 cytokines = colnames(adm %>% select(ct:RANTES))
 
 
-selectizeInput("Factor3", "Factor(s)",
+selectizeInput("Factor3", h4("Additional Factor(s)"),
              choices  = cytokines,
              # selected = c("TM", "IL8", "DDIMER"),
              options  = list(`actions-box` = TRUE),
