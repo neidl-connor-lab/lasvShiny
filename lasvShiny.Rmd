@@ -81,9 +81,6 @@ Column
 
 #### Demographic Data
 
-<!-- <button class="btn btn-primary" data-toggle="collapse" data-target="#BlockName"> Show/Hide </button>   -->
-<!-- <div id="BlockName" class="collapse">   -->
-
 *Datasets:*
 
 * Participants were divided into two datasets for statistical analysis: 
@@ -149,7 +146,7 @@ mainPanel(
 Proteins
 =======================================================================
 
-Column  {.tabset .tabset-fade data-height=300}
+Column  {.tabset .tabset-fade}
 -----------------------------------------------------------------------
 
 ### Density
@@ -267,7 +264,7 @@ renderPlotly({
 })
 ```
 
-### Statistics
+### Boxplot Stats
 
 ```{r}
 
@@ -316,6 +313,12 @@ names(rocData) <- cytokines
 
 rocRes <- rocCoords(rocFits = rocData, glmCoefs = glmCo, cytokines)
 
+rocResFormat <- rocRes %>% rownames_to_column("Var") %>%
+  left_join(units, by = "Var") %>%
+  select(Name, AUC, Threshold=thresh.val, Units, p.value, 
+         specificity, sensitivity, ppv, npv) %>%
+  mutate_if(is.numeric, round, 3) 
+
 r <- function(f){
   pROC::ggroc(rocData[f])+
           coord_fixed() +
@@ -334,8 +337,18 @@ mainPanel(
     r(c(input$Factor1, input$Factor3))
     
   })
-  
- 
 )
 ```
+
+### ROC Data
+
+
+```{r}
+mainPanel(
+
+  DT::renderDataTable(DT::datatable(rocResFormat))
+  
+)
+```
+
 
