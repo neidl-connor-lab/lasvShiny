@@ -142,7 +142,7 @@ stat.table <- function(df, cytokines) {
                        "p.adj")) %>%
         mutate(#p.value = sub(pattern="^0$", "<0.0001", p.value),
             p.adj = case_when(p.adj == 0 ~ "<0.0001",
-                              p.adj >= 0.1 ~ "NS",
+                              # p.adj >= 0.1 ~ "NS",
                               TRUE ~ as.character(p.adj))
             # p.adj = sub(pattern="^0$", "<0.0001", p.adj),
             # p.adj = sub(pattern = "^1$", "NS", p.adj)

@@ -12,7 +12,7 @@ output:
 
 --- 
 
-```{r global, include=FALSE}
+```{r setup global, include=FALSE, warning=FALSE}
 
 ###-----Load Packages----
 
@@ -38,7 +38,9 @@ pacman::p_load(shiny,
                gghighlight,
                flexdashboard,
                lubridate,
-               RColorBrewer
+               RColorBrewer,
+               sqldf,
+               patchwork
                )
 
 source("dataImport.R")
@@ -53,22 +55,26 @@ Sidebar {.sidebar}
 ====================
 
 ```{r}
+cytokines = colnames(adm %>% select(ct:RANTES))
 
+radioButtons("Color", h4("Color"),
+         choices  = colnames(metaPatients)[-c(1,4)],
+         selected = "Outcome")
+
+tags$i("*Color is for visualization")
+tags$br()
 pickerInput("Factor1", h4("Factor"),
-             choices  = levels(factor(box.data$Factor)), 
+             choices  = sort(cytokines), 
              selected = "ct",
              options  = list(`actions-box` = TRUE), multiple = F
              )
 
 pickerInput("Factor2", h4("Factor 2 (Scatter y-axis)"),
-             choices  = levels(factor(box.data$Factor)), 
+             choices  = sort(cytokines), 
              selected = "PAI1",
              options  = list(`actions-box` = TRUE), multiple = F
              )
 
-radioButtons("Color", h4("Color"),
-         choices  = colnames(metaPatients)[-c(1,4)],
-         selected = "Outcome")
 
 
 ```
@@ -152,6 +158,7 @@ Column  {.tabset .tabset-fade}
 ### Density
 
 ```{r}
+# adm <- adm %>% mutate(sTNFRII.I = sTNFRII/sTNFRI) %>% dplyr::relocate(sTNFRII.I, .after = sTNFRII)
 
 p <-  function(f) {
   box.data %>% filter(Factor %in% c(f)) %>%
@@ -163,6 +170,8 @@ p <-  function(f) {
       theme_pubr() 
   
   } %>% ggplotly(height = 300, width = 600) 
+
+
 
 shiny::fluidRow(
   
@@ -209,6 +218,7 @@ s <- function(c){
   
 
 
+
 renderPlotly({
   
   s(input$Color)
@@ -245,7 +255,7 @@ b <- function(f, c) {
       geom_boxplot(outlier.color = NA,
                    outlier.size = 0,
                    outlier.shape = NA)  +
-      geom_jitter(position = position_jitterdodge(), 
+      geom_point(position = position_jitterdodge(), 
                   aes_string(fill=c), 
                   alpha=0.75,
                   shape=21,
@@ -259,7 +269,8 @@ b <- function(f, c) {
 
 renderPlotly({
 
-    b(input$Factor1, input$Color)%>% ggplotly(height = 500, width = 700, ) 
+    b(input$Factor1, input$Color) %>% 
+        ggplotly(height = 500, width = 700) 
   
 })
 ```
@@ -285,18 +296,11 @@ renderPlot({
 
 ### ROC Curves
 
-*Note, ROC curves not yet available in this app for clinical parameters (AST, ALT, BUN, CRE).*
+
 ```{r}
+
 cytokines = colnames(adm %>% select(ct:RANTES))
 
-
-selectizeInput("Factor3", h4("Additional Factor(s)"),
-             choices  = cytokines,
-             # selected = c("TM", "IL8", "DDIMER"),
-             options  = list(`actions-box` = TRUE),
-             multiple = T
-             )
-             
 
 
 
@@ -324,19 +328,56 @@ r <- function(f){
           coord_fixed() +
           scale_fill_discrete(labels=c(get.pretty.name(f)))+
           theme_pubr() +
-          theme(legend.position = c(0.65, 0.4),
-                legend.text = element_text(size = 12),
+          theme(#legend.position = c(0.65, 0.4),
+                # legend.text = element_text(size = 12),
                 legend.title = element_blank()) 
-    # geom_point(aes(x = rocRes$specificity[f], y =rocRes$sensitivity[f]))
+    
   } %>% ggplotly(height = 400, width = 600) #%>% layout(height = 400, width = 600)
 
 
+conMat <- rocRes %>% select(tp, fn, fp, tn) %>%
+      rownames_to_column("var") 
+
+# fctrs <- c("ct", "PAI1")
+confusionMat <- lapply(1:length(cytokines),
+                       function(x) data.frame(
+                           "Pred" = c("Pred Surv", "Pred Fatal"),
+                           "Survivor" = c(conMat$tp[x], conMat$fn[x]),
+                           "Fatal" = c(conMat$fp[x], conMat$tn[x])) %>%
+                           column_to_rownames(var="Pred") 
+                        ) 
+names(confusionMat) <- cytokines
+
+# DT::datatable(confusionMat[["ct"]])
+# 
+# 
+# lapply(1:length(c("ct", "PAI1", "DDIMER")),
+#                             function(x) 
+# 
+#                                     confusionMat[[c("ct", "PAI1", "DDIMER")[x]]] ) %>%
+#                     DT::datatable()
+
 mainPanel(
-  renderPlotly({
+
+    h4(("Confusion Matrix for Chosen Factor")),
     
-    r(c(input$Factor1, input$Factor3))
+    renderDataTable(confusionMat[[input$Factor1]]),
     
-  })
+
+    tags$br(),
+
+    renderPlotly({
+        
+        r(c(input$Factor1, input$Factor3))
+        
+      }),
+    
+    selectizeInput("Factor3", h4("Add Additional Factor(s) to Plot"),
+         choices  = cytokines,
+         # selected = c("TM", "IL8", "DDIMER"),
+         options  = list(`actions-box` = TRUE, ),
+         multiple = T
+         )
 )
 ```
 
@@ -352,3 +393,237 @@ mainPanel(
 ```
 
 
+Longitudinal
+=======================================================================
+
+Column  {.tabset .tabset-fade}
+-----------------------------------------------------------------------
+
+### Individual Markers
+```{r warning=FALSE}
+
+
+thresh <- rocRes %>% rownames_to_column("var") %>%
+  select(var, Threshold = thresh.val) 
+
+	
+long <- cytoAll %>%
+    select(id, dpi, Outcome, !!cytokines) %>%
+    filter(Outcome %in% c("Fatal", "Survivor")) %>%
+	group_by(id) %>%
+	gather(key = "var", value = "Value", -Outcome, -id, -dpi)%>% 
+	left_join(thresh, by="var")%>% 
+	mutate(Factor = get.pretty.name(var),
+	       Units = get.pretty.factor(var),
+	       dpi = floor(dpi)) %>%
+	na.omit() %>%
+	group_by(id, var) %>%
+	filter(dpi < 12, Value >= .1) %>%
+	arrange(id)
+
+
+survive.severe <- long %>% 
+    filter(dpi == 0 & Outcome=='Survivor') %>%
+	filter(var=="ct" & Value<Threshold | var!="ct" & Value>Threshold)%>% 
+	select(id, var)%>%
+	left_join(long, by = c("id", "var"))%>%
+	add_column(Timing = "Survivor \n(Predicted Fatal)") %>%
+	# select(id, Outcome, dpi, var, Factor, Value, Threshold, Units, Timing) %>%
+	data.frame()
+		
+survive.mild <- long %>% filter(dpi == 0 & Outcome=='Survivor') %>%
+	filter(var=="ct" & Value>Threshold | var!="ct" & Value<Threshold)%>% 
+	select(id, var)%>%
+	left_join(long, by = c("id", "var"))%>%
+	add_column(Timing = "Survivor \n(Predicted Survivor)") %>%
+    # select(id, Outcome, dpi, var, Factor, Value, Threshold, Units, Timing) %>%
+    data.frame()
+	
+fatal.late <- sqldf(
+        "SELECT * FROM long WHERE id IN 
+        (SELECT DISTINCT id FROM long WHERE dpi > 3 and Outcome='Fatal')"
+        ) %>% 
+    add_column(Timing = "Fatal \nLate (>3 days)") %>%
+    # select(id, Outcome, dpi, var, Factor, Value, Threshold, Units, Timing) %>%
+		data.frame()
+
+fatal.early <- long %>% filter(Outcome == "Fatal", !id %in% fatal.late$id) %>% 
+    add_column(Timing = "Fatal \nEarly (<=3 days)") %>%
+    # select(id, Outcome, dpi, var, Factor, Value, Threshold, Units, Timing) %>%
+    data.frame()
+
+
+
+cases.plot.survive <- rbind(survive.severe, survive.mild) 
+cases.plot.fatal <- rbind(fatal.late, fatal.early) 
+cases.plot.all <- rbind(cases.plot.fatal, cases.plot.survive) %>% ungroup()
+
+
+longPlots <- function(cases, v){
+
+    cases %>% filter(var == v) %>%
+    ggplot(aes(x = dpi, y = Value, color = Outcome )) +
+    	
+        geom_jitter(alpha=0.4) +
+        color_palette(c("red", "blue")) +
+
+    	facet_grid(. ~ Timing
+    	           ) +
+
+    	theme_pubr() +
+        theme(text = element_text(size = 16),
+    	      legend.title = element_blank(),
+    	      strip.background = element_blank(),
+    	    axis.title.y = element_blank()
+    	      ) +
+    	# xlim(0,12)+
+        labs(x = "DPI", #y = get.pretty.units(v),
+             title = get.pretty.factor(v)) +
+    	geom_hline(aes(yintercept = Threshold), 
+    	           linetype="dashed", color="black") +
+    	geom_smooth(method = "loess", formula = y~x)+
+	    scale_y_continuous(trans = "log10")+
+        scale_x_continuous(name = "DPI", breaks = seq(0,12,by = 3))
+}
+
+
+
+fluidRow(
+    renderPlotly( longPlots(cases.plot.all, input$Factor1) %>%
+                      ggplotly(height = 500, width = 850)%>%
+    layout(legend = list(orientation = "h", x = 0.25, y = -0.25)) )
+)
+
+```
+
+### Survival based on PAI-1 Prediction
+```{r warning=F}
+survive.severe.PAI1.ids <- survive.severe %>% 
+    filter(var=="PAI1") %>%
+    select(id) %>%
+    distinct() %>%
+    unlist()
+
+survive.mild.PAI1.ids <- survive.mild %>% 
+    filter(var=="PAI1") %>%
+    select(id) %>%
+    distinct() %>%
+    unlist()
+
+survive.severe.PAI1 <- long %>% filter(dpi == 0 & Outcome=='Survivor') %>%
+	filter(id %in% survive.severe.PAI1.ids)%>% 
+	select(id, var)%>% 
+	left_join(long, by = c("id", "var"))%>% 
+	add_column(Timing = "Survivor \n(Predicted Fatal \nby PAI-1)") %>%
+	select(id, Outcome, dpi, var, Factor, Value, Threshold, Units, Timing) %>%
+	data.frame()
+		
+survive.mild.PAI1 <- long %>% filter(dpi == 0 & Outcome=='Survivor') %>%
+	filter(id %in% survive.mild.PAI1.ids)%>% 
+	select(id, var)%>% 
+	left_join(long, by = c("id", "var"))%>% 
+	add_column(Timing = "Survivor \n(Predicted Survivor \nby PAI-1)") %>%
+    select(id, Outcome, dpi, var, Factor, Value, Threshold, Units, Timing) %>%
+    data.frame()
+
+
+cases.plot.all.PAI1 <- rbind(cases.plot.fatal, survive.severe.PAI1, survive.mild.PAI1) %>% ungroup()
+
+
+
+fluidRow(
+    renderPlotly( longPlots(cases.plot.all.PAI1, input$Factor1) %>%
+                      ggplotly(height = 500, width = 850)%>%
+    layout(legend = list(orientation = "h", x = 0.25, y = -0.25)) )
+)
+
+```
+
+
+
+### Prediction by PAI-1 on Day 0
+```{r warning=F}
+
+
+
+pai1.predict.fatal <- sqldf("SELECT * FROM long WHERE id IN 
+        (SELECT DISTINCT id FROM long 
+         WHERE dpi = 0 AND var = 'PAI1' AND Value >= Threshold)"
+        ) %>%
+	add_column(Timing = "Predicted Fatal") %>%
+    mutate(Accuracy = case_when(Outcome == "Fatal" ~ "TP, n=61",
+                                Outcome == "Survivor" ~ "FP, n=21"))
+
+pai1.predict.surv <- sqldf("SELECT * FROM long WHERE id IN 
+        (SELECT DISTINCT id FROM long 
+         WHERE dpi = 0 AND var = 'PAI1' AND Value < Threshold)"
+        ) %>% 
+	add_column(Timing = "Predicted Survivor")%>%
+    mutate(Accuracy = case_when(Outcome == "Fatal" ~ "FN, n=11",
+                                Outcome == "Survivor" ~ "TN, n=101"))
+
+pai1.prediction <- rbind(pai1.predict.fatal, pai1.predict.surv) %>% 
+    ungroup() 
+# %>%
+#     mutate(Accuracy = factor(Accuracy, levels = c("TP", "FP", "FN", "TN")))
+
+
+
+# dat_text <- data.frame(
+#     Outcome   = c("Fatal", "Fatal", "Survivor", "Survivor"),
+#     Timing    = c("Predicted Fatal", "Predicted Survivor", "Predicted Fatal", "Predicted Survivor"),
+#     label = c("n=61", "n = 11", "n = 21", "n = 101")
+# )
+
+pai.plot <- function(cases, v){
+
+    
+    ggplot(cases %>% filter(var == v), 
+           aes(x = dpi, y = Value, color=Accuracy)) +
+    	geom_jitter(alpha=0.5
+    	           # position=position_jitterdodge(jitter.width = .5)
+    	           ) +
+    	facet_grid(Outcome ~ Timing, margins = T) +
+    	color_palette(c("red4", "purple4", "blue", "red"))  +
+        # scale_fill_manual(values = rep("gray2", 4)) +
+        theme_pubr()+
+    	theme(text = element_text(size = 16),
+    	      legend.title = element_blank(),
+    	      strip.background = element_blank(),
+    	      axis.title.y = element_blank()
+    	      ) +
+
+    	# xlim(0,12)+
+        labs(x = "DPI", #y = paste0(get.pretty.units(v), "\n"),
+             title = get.pretty.factor(v)) +
+    	geom_hline(aes(yintercept = Threshold), 
+    	           linetype="dashed", color="black") +
+    	geom_smooth(method = "loess", formula = y~x)+
+	    scale_y_continuous(trans = "log10") +
+        scale_x_continuous(name = "DPI", breaks = seq(0,12,by = 3))
+    # +
+    #     geom_text(
+    #         size = 5,
+    #         x = 8, y = .1,
+    #         aes(label = label),
+    #         data    = dat_text,
+    #         inherit.aes = F
+    #         )
+
+}
+
+
+# pai.plot(pai1.prediction, c("PAI1"))  
+
+
+
+fluidRow(
+
+    renderPlotly( pai.plot(pai1.prediction, input$Factor1)  %>%
+                      ggplotly(height = 700, width = 950)
+                  %>% layout(legend = list(orientation = "h", 
+                                           x = 0.25, y = -.1))
+    )
+)
+
+```
