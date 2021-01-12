@@ -375,7 +375,7 @@ mainPanel(
     selectizeInput("Factor3", h4("Add Additional Factor(s) to Plot"),
          choices  = cytokines,
          # selected = c("TM", "IL8", "DDIMER"),
-         options  = list(`actions-box` = TRUE, ),
+         options  = list(`actions-box` = TRUE),
          multiple = T
          )
 )
