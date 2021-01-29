@@ -410,8 +410,10 @@ thresh <- rocRes %>% rownames_to_column("var") %>%
 long <- cytoAll %>%
     select(id, dpi, Outcome, !!cytokines) %>%
     filter(Outcome %in% c("Fatal", "Survivor")) %>%
+    left_join(metaPatients %>% select(id, Dataset, Sex, State, AgeBin), by = "id") %>%
 	group_by(id) %>%
-	gather(key = "var", value = "Value", -Outcome, -id, -dpi)%>% 
+	gather(key = "var", value = "Value", 
+	       -Outcome, -id, -dpi, -Dataset, -Sex, -State, -AgeBin)%>% 
 	left_join(thresh, by="var")%>% 
 	mutate(Factor = get.pretty.name(var),
 	       Units = get.pretty.factor(var),
@@ -459,13 +461,14 @@ cases.plot.fatal <- rbind(fatal.late, fatal.early)
 cases.plot.all <- rbind(cases.plot.fatal, cases.plot.survive) %>% ungroup()
 
 
-longPlots <- function(cases, v){
+longPlots <- function(cases, v, c){
 
     cases %>% filter(var == v) %>%
-    ggplot(aes(x = dpi, y = Value, color = Outcome )) +
+    ggplot(aes(x = dpi, y = Value )) +
     	
-        geom_jitter(alpha=0.4) +
-        color_palette(c("red", "blue")) +
+        geom_jitter(alpha=0.4, 
+                  aes_string(color=c)) +
+        # color_palette(c("red", "blue")) +
 
     	facet_grid(. ~ Timing
     	           ) +
@@ -474,70 +477,101 @@ longPlots <- function(cases, v){
         theme(text = element_text(size = 16),
     	      legend.title = element_blank(),
     	      strip.background = element_blank(),
-    	    axis.title.y = element_blank()
+              # axis.title.y = element_blank(),
+              plot.title = element_text(vjust = .5)
     	      ) +
-    	# xlim(0,12)+
-        labs(x = "DPI", #y = get.pretty.units(v),
-             title = get.pretty.factor(v)) +
+        labs(x = "DPI", y = get.pretty.units(v), title = get.pretty.name(v)
+             ) +
+        # ggtitle(get.pretty.factor(v)) +
     	geom_hline(aes(yintercept = Threshold), 
     	           linetype="dashed", color="black") +
-    	geom_smooth(method = "loess", formula = y~x)+
+    	geom_smooth(method = "loess", formula = y~x, aes_string(color=c))+
 	    scale_y_continuous(trans = "log10")+
         scale_x_continuous(name = "DPI", breaks = seq(0,12,by = 3))
 }
 
+# gp <- longPlots(cases.plot.all, "PAI1", "Dataset") %>% #test the plot %>%
+#                       ggplotly(height = 500, width = 850)%>%
+#     layout(legend = list(orientation = "h", x = 0.25, y = -0.25),
+#            title = list(y = 1.75),
+#            margin = list(t = 110)) 
+# 
+# 
+# layout_ggplotly <- function(gg, x = -0.15, y = -0.08){
+#   # The 1 and 2 goes into the list that contains the options for the x and y axis labels respectively
+#   gp[['x']][['layout']][['annotations']][[1]][['y']] <- x #move x-axis label down
+#   gp[['x']][['layout']][['annotations']][[2]][['x']] <- y #move y-axis label left
+#   # gp[['x']][['layout']][['margin']][['t']] <- 110
+#   gp
+# }
+# 
+# gp %>% layout_ggplotly
 
+
+layout_ggplotly <- function(gp, x = -0.15, y = -0.08){
+  # The 1 and 2 goes into the list that contains the options for the x and y axis labels respectively
+  gp[['x']][['layout']][['annotations']][[1]][['y']] <- x #move x-axis label down
+  gp[['x']][['layout']][['annotations']][[2]][['x']] <- y #move y-axis label left
+  # gp[['x']][['layout']][['margin']][['t']] <- 110
+  gp
+}
 
 fluidRow(
-    renderPlotly( longPlots(cases.plot.all, input$Factor1) %>%
+    
+    renderPlotly( longPlots(cases.plot.all, input$Factor1, input$Color) %>% #test the plot %>%
                       ggplotly(height = 500, width = 850)%>%
-    layout(legend = list(orientation = "h", x = 0.25, y = -0.25)) )
+        layout(legend = list(orientation = "h", x = 0.25, y = -0.25),
+           title = list(y = 1.75),
+           margin = list(t = 110)) %>% 
+        layout_ggplotly )
 )
 
 ```
 
-### Survival based on PAI-1 Prediction
-```{r warning=F}
-survive.severe.PAI1.ids <- survive.severe %>% 
-    filter(var=="PAI1") %>%
-    select(id) %>%
-    distinct() %>%
-    unlist()
+<!-- ### Survival based on PAI-1 Prediction -->
+<!-- ```{r warning=F} -->
+<!-- survive.severe.PAI1.ids <- survive.severe %>%  -->
+<!--     filter(var=="PAI1") %>% -->
+<!--     select(id) %>% -->
+<!--     distinct() %>% -->
+<!--     unlist() -->
 
-survive.mild.PAI1.ids <- survive.mild %>% 
-    filter(var=="PAI1") %>%
-    select(id) %>%
-    distinct() %>%
-    unlist()
+<!-- survive.mild.PAI1.ids <- survive.mild %>%  -->
+<!--     filter(var=="PAI1") %>% -->
+<!--     select(id) %>% -->
+<!--     distinct() %>% -->
+<!--     unlist() -->
 
-survive.severe.PAI1 <- long %>% filter(dpi == 0 & Outcome=='Survivor') %>%
-	filter(id %in% survive.severe.PAI1.ids)%>% 
-	select(id, var)%>% 
-	left_join(long, by = c("id", "var"))%>% 
-	add_column(Timing = "Survivor \n(Predicted Fatal \nby PAI-1)") %>%
-	select(id, Outcome, dpi, var, Factor, Value, Threshold, Units, Timing) %>%
-	data.frame()
-		
-survive.mild.PAI1 <- long %>% filter(dpi == 0 & Outcome=='Survivor') %>%
-	filter(id %in% survive.mild.PAI1.ids)%>% 
-	select(id, var)%>% 
-	left_join(long, by = c("id", "var"))%>% 
-	add_column(Timing = "Survivor \n(Predicted Survivor \nby PAI-1)") %>%
-    select(id, Outcome, dpi, var, Factor, Value, Threshold, Units, Timing) %>%
-    data.frame()
+<!-- survive.severe.PAI1 <- long %>% filter(dpi == 0 & Outcome=='Survivor') %>% -->
+<!-- 	filter(id %in% survive.severe.PAI1.ids)%>%  -->
+<!-- 	select(id, var)%>%  -->
+<!-- 	left_join(long, by = c("id", "var"))%>%  -->
+<!-- 	add_column(Timing = "Survivor \n(Predicted Fatal \nby PAI-1)") %>% -->
+<!-- 	select(id, Outcome, dpi, var, Factor, Value, Threshold, Units, Timing) %>% -->
+<!-- 	data.frame() -->
 
-
-cases.plot.all.PAI1 <- rbind(cases.plot.fatal, survive.severe.PAI1, survive.mild.PAI1) %>% ungroup()
+<!-- survive.mild.PAI1 <- long %>% filter(dpi == 0 & Outcome=='Survivor') %>% -->
+<!-- 	filter(id %in% survive.mild.PAI1.ids)%>%  -->
+<!-- 	select(id, var)%>%  -->
+<!-- 	left_join(long, by = c("id", "var"))%>%  -->
+<!-- 	add_column(Timing = "Survivor \n(Predicted Survivor \nby PAI-1)") %>% -->
+<!--     select(id, Outcome, dpi, var, Factor, Value, Threshold, Units, Timing) %>% -->
+<!--     data.frame() -->
 
 
+<!-- cases.plot.all.PAI1 <- rbind(cases.plot.fatal %>% -->
+<!--     select(id, Outcome, dpi, var, Factor, Value, Threshold, Units, Timing),  -->
+<!--     survive.severe.PAI1, survive.mild.PAI1) %>% ungroup() -->
 
-fluidRow(
-    renderPlotly( longPlots(cases.plot.all.PAI1, input$Factor1) %>%
-                      ggplotly(height = 500, width = 850)%>%
-    layout(legend = list(orientation = "h", x = 0.25, y = -0.25)) )
-)
 
-```
+
+<!-- fluidRow( -->
+<!--     renderPlotly( longPlots(cases.plot.all.PAI1, input$Factor1) %>% -->
+<!--                       ggplotly(height = 500, width = 850)%>% -->
+<!--     layout(legend = list(orientation = "h", x = 0.25, y = -0.25)) ) -->
+<!-- ) -->
+
+<!-- ``` -->
 
 
 

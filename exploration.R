@@ -378,3 +378,39 @@ bun.cre <- adm %>%
     mutate(bun.cre = as.numeric(BUN/CRE)) %>%
     select(Outcome, bun.cre)
 
+# Age
+#
+age.sig <- adm_all %>% filter(Age >40) %>% stat.table(cytokines = c("ct", cytokines))%>%
+    filter(p.adj < 0.05) %>% arrange(p.adj)
+
+age.factors <- age.sig$Factor %>% as.character()
+age.hits <- topGLM(adm_all, age.factors)
+
+
+#Pairwise logistic regression
+#
+cytokines = colnames(adm %>% select(ct:RANTES))
+
+
+
+
+glmDat <- glmPairs(adm, cytokines)
+
+glmCo <- glmDat %>%
+    glmCoefs(cytokines)
+
+rocData <- glmDat %>%
+    rocFits(cytokines)
+
+# names(rocData) <- cytokines
+
+
+rocRes <- rocCoords(rocFits = rocData, glmCoefs = glmCo, cytokines)
+
+rocResFormat <- rocRes %>% rownames_to_column("Var") %>%
+    left_join(units, by = "Var") %>%
+    select(Name, AUC, Threshold=thresh.val, Units, p.value,
+           specificity, sensitivity, ppv, npv) %>%
+    mutate_if(is.numeric, round, 3)
+
+

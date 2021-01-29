@@ -177,12 +177,15 @@ glmFits <- function(cases, cytokines, ...) {
     fmla <- sapply(1:length(cytokines), function(x, var = cytokines) {
         fmla <- as.formula(paste0("as.factor(Outcome) ~ ", var[x]))
     })
-    glmFits <- lapply(fmla, function(x, dfcases = cases) {
+    glmFits <- lapply(fmla, function(x, dfcases = adm) {
         glm(x, data=dfcases, family = binomial, na.action = na.omit)
     })
 
     return(glmFits)
 }
+
+
+
 
 glmCoefs <-  function(glmFits, cytokines=cytokines, ...)  {
     # get glm coefficients and significance from fits (glmFits)
@@ -247,38 +250,143 @@ rocCoords <- function(rocFits, glmCoefs, cytokines=cytokines, ...) {
 #
 
 
+# USAGE---------------------
+# glmDat <- glmFits(adm, cytokines)
+#
+# glmCo <- glmDat %>%
+#     glmCoefs(cytokines)
+#
+# rocData <- glmDat %>%
+#     rocFits(cytokines)
+#
+# names(rocData) <- cytokines
+#
+# rocRes <- rocCoords(rocFits = rocData, glmCoefs = glmCo, cytokines)
+# ---------------------------
+
+
+#Same as glmFits, but for pairs of cytokines
+glmPairFits <- function(cases, cytokines, ...) {
+    # lapply(1:(length(cytokines)-1) (x) {
+    #     sapply((x+1 : length(cytokines) (y) {
+
+    fmla <- sapply(1 : (length(cytokines)-1), function(x, var = cytokines) {
+        sapply( (x+1) : length(cytokines),function(y, var = cytokines) {
+            fmla <- as.formula(paste0("as.factor(Outcome) ~ ", var[x], "+", var[y]))
+        })
+    })%>% unlist()
+
+
+    glmPairFits <- lapply(fmla, function(x, dfcases = adm_all) {
+        glm(x, data=dfcases, family = binomial, na.action = na.omit)
+    })
+
+#     return(glmPairFits)
+# }
+#
+#
+#
+# glmPairCoefs <-  function(glmPairFits, cytokines=cytokines, ...)  {
+#     # get glm coefficients and significance from fits (glmFits)
+#     # fit.intercept <- sapply(1:length(glmPairFits),
+#     #                         function(x) (coef(glmPairFits[[x]])[1] ) )
+#     # fit.cytokine1 <- sapply(1:length(glmPairFits),
+#     #                        function(x) (coef(glmPairFits[[x]])[2] ) )
+#     # fit.cytokine2 <- sapply(1:length(glmPairFits),
+#     #                         function(x) (coef(glmPairFits[[x]])[3] ) )
+
+
+    ## Not working ---- need this for threshold values
+    # glmCoefs <- sapply(glmPairFits, function(x) {
+        cytokine1 <- sapply(1:length(fmla), function(x) {
+                            fmla[[x]][[3]][[2]]}) %>% as.character()  # %>% as.vector()
+
+        cytokine2 <- sapply(1:length(fmla), function(x) {
+                            fmla[[x]][[3]][[3]]}) %>% as.character()
+    #     fit.intercept <- coef(glmPairFits[[x]])[1]
+    #     fit.cytokine1 <- coef(glmPairFits[[x]])[2]
+    #     fit.cytokine2 <- coef(glmPairFits[[x]])[3]
+    #     })
+    #
+    #     data.frame() %>%
+    #         t() %>%
+    #         set_colnames(c("cytokine1", "cytokine2", "fit.intercept", "fit.cytokine1", "fit.cytokine2"))
+    #
+
+
+
+    # p.value <- sapply(glmPairFits, function(x) summary(x)$coefficients [8])
+#
+#     return(glmCoefs)
+# }
+#
+#
+# rocPairCoords <- function(rocFits, glmCoefs, cytokines=cytokines, ...) {
+    # AUCs of each ROC curve
+    rocFits <- lapply(glmPairFits, function(x)
+        roc(response = x$y, predictor = x$fitted.values, na.rm = T,
+            # auc = TRUE, levels = c(0, 1), direction = "auto",
+            quiet = T) ) #%>% names(cytokines)
+
+    AUC <- sapply(rocFits, function(x) x$auc )
+
+    # coordinates of the best (top-left corner) threshold of ROC curve
+    # and measures of prediction accuracy
+    rocCoords <- sapply(rocFits, function(y)
+        coords(y, ret=c(#"threshold",
+                        "specificity",
+                        "sensitivity", "accuracy",
+                        "ppv", "npv", "tpr", "tnr",
+                        "fnr", "fpr", "fdr",
+                        "tn", "tp", "fn", "fp"),
+               transpose=T,
+               x="best",
+               best.method="c"),
+        simplify = T) %>%
+
+        t() %>%
+        data.frame() %>%
+        cbind(AUC, cytokine1, cytokine2)
+
+    return(rocCoords)
+}
+
+
+# glmPairs <- glmPairFits(cases = adm, cytokines = cytokines)
+
+
 
 #
-# rocPlot implemented in Shiny app
+# glmPairDat <- glmPairFits(adm, cytokines)
 #
-# rocPlot <- function(rocFits, cytokines) {
+# glmPairCo <- glmPairDat %>%
+#     glmPairCoefs(cytokines)
 #
-#     # which factors to plot?
+# rocPairData <- glmPairDat %>%
+#     rocFits(cytokines)
 #
-#     pROC::ggroc(rocList[[1]]) +
-#         coord_fixed() +
-#         scale_color_lancet(labels=get.pretty.name(cytokines[1]))+
-#         theme_pubr() +
-#         theme(legend.position = c(0.65, 0.4),
-#               legend.text = element_text(size = 12))
+# # names(rocData) <- cytokines
 #
-# }
+# rocRes <- rocPairCoords(rocFits = rocPairData, glmCoefs = glmPairCo, cytokines)
+#
+
+
 
 #Run glmSingle with correctly formated dataframe
-topGLM <- function(cases, sig.cytokines) { cases %>%
-        select(Outcome, !!sig.cytokines) %>%
-        filter(Outcome %in% c("Survivor", "Fatal")) %>%
-        glmSingle(cytokines = sig.cytokines) %>%
-        rownames_to_column(var = "Factor") %>%
-        mutate(AUC=round(AUC, digits=3),
-               p.value = round(p.value, digits = 4),
-               p.value = sub(pattern="^0$", "<0.0001", p.value),
-               Threshold=round(x = thresh.val, digits = 1),
-               Threshold=str_c(Threshold, get.pretty.units(sig.cytokines), sep = " "),
-               auc.rank = row_number(desc(AUC)),
-               MCC = mcc(TP = tp, FP = fp, TN = tn, FN = fn))  %>%
-        arrange(Factor)
-}
+# topGLM <- function(cases, sig.cytokines) { cases %>%
+#         select(Outcome, !!sig.cytokines) %>%
+#         filter(Outcome %in% c("Survivor", "Fatal")) %>%
+#         glmSingle(cytokines = sig.cytokines) %>%
+#         rownames_to_column(var = "Factor") %>%
+#         mutate(AUC=round(AUC, digits=3),
+#                p.value = round(p.value, digits = 4),
+#                p.value = sub(pattern="^0$", "<0.0001", p.value),
+#                Threshold=round(x = thresh.val, digits = 1),
+#                Threshold=str_c(Threshold, get.pretty.units(sig.cytokines), sep = " "),
+#                auc.rank = row_number(desc(AUC)),
+#                MCC = mcc(TP = tp, FP = fp, TN = tn, FN = fn))  %>%
+#         arrange(Factor)
+# }
 
 epi.summary <- function(cyto.data) {
     # cyto.data = cyto2017
