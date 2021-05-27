@@ -378,23 +378,59 @@ bun.cre <- adm %>%
     mutate(bun.cre = as.numeric(BUN/CRE)) %>%
     select(Outcome, bun.cre)
 
-# Age
+# Age---------------------------------------
 #
-age.sig <- adm_all %>% filter(Age >40) %>% stat.table(cytokines = c("ct", cytokines))%>%
-    filter(p.adj < 0.05) %>% arrange(p.adj)
+#
+adm.over40 <- adm %>% filter(Age >40)
+
+
+
+age.sig <- adm.over40 %>%
+    stat.table(cytokines = c("ct", cytokines))%>%
+    filter(p.adj < 0.05) %>%
+    arrange(p.adj)
 
 age.factors <- age.sig$Factor %>% as.character()
-age.hits <- topGLM(adm_all, age.factors)
 
 
-#Pairwise logistic regression
+
+glmDat <- glmFits(cases.df = adm.over40, c("ct", cytokines))
+
+glmCo <- glmDat %>%
+    glmCoefs(cytokines= c("ct", cytokines))
+
+rocData <- glmDat %>%
+    rocFits(cytokines= c("ct", cytokines))
+
+names(rocData) <- c("ct", cytokines)
+
+rocRes <- rocCoords(rocFits = rocData, glmCoefs = glmCo, cytokines= c("ct", cytokines))
+
+
+
+# Late Fatals
+fatal.late.ids <- sqldf("SELECT DISTINCT id FROM long WHERE dpi > 3 and Outcome='Fatal'") %>% unlist()
+
+fatal.late.adm <- adm_all %>% filter(id %in% fatal.late.ids)
+
+
+lc <- log.cyto(fatal.late.adm, cytokines)%>% filter(Outcome %in% c("Survivor", "Fatal"))
+
+p.over40 <- lc %>% filter(Age>=40) %>% select(!!cytokines) %>% ttest()
+p.under40 <- lc %>% filter(Outcome=="Fatal") %>% select(!!cytokines) %>% ttest()
+
+
+sapply(select(lc, all_of(cytokines)), function(y) glm(y~lc$Age))
+
+
+#Pairwise logistic regression ---------------
 #
 cytokines = colnames(adm %>% select(ct:RANTES))
 
 
 
 
-glmDat <- glmPairs(adm, cytokines)
+glmDat <- glmPairFits(adm, cytokines)
 
 glmCo <- glmDat %>%
     glmCoefs(cytokines)
@@ -412,5 +448,6 @@ rocResFormat <- rocRes %>% rownames_to_column("Var") %>%
     select(Name, AUC, Threshold=thresh.val, Units, p.value,
            specificity, sensitivity, ppv, npv) %>%
     mutate_if(is.numeric, round, 3)
+
 
 

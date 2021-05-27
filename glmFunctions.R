@@ -172,13 +172,15 @@ cyto.corr <- function(cases, rects) {
 ###-----Modeling----
 
 
-glmFits <- function(cases, cytokines, ...) {
+glmFits <- function(cases.df, cyto, ...) {
 
-    fmla <- sapply(1:length(cytokines), function(x, var = cytokines) {
-        fmla <- as.formula(paste0("as.factor(Outcome) ~ ", var[x]))
+    fmla <- sapply(1:length(cyto), function(x, var = cyto) {
+        as.formula(paste0("as.factor(Outcome) ~ ", var[x]))
     })
-    glmFits <- lapply(fmla, function(x, dfcases = adm) {
-        glm(x, data=dfcases, family = binomial, na.action = na.omit)
+
+
+    glmFits <- lapply(fmla, function(y) {
+        glm(y, data=cases.df, family = binomial, na.action = na.omit)
     })
 
     return(glmFits)
@@ -231,11 +233,11 @@ rocCoords <- function(rocFits, glmCoefs, cytokines=cytokines, ...) {
                         "tn", "tp", "fn", "fp"),
                transpose=T,
                x="best",
-               best.method="c"),
+               best.method="c",
+               best.weights=c(5, .2)), #NEED TO TEST WEIGHTS
          simplify = T) %>%
-
-        t() %>%
         data.frame() %>%
+        t() %>% data.frame() %>%
         cbind(AUC, glmCoefs) %>%
         mutate(thresh.val = (log(threshold/(1-threshold)) -
                                  fit.intercept) / fit.cytokine) %>%
