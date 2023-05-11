@@ -7,9 +7,6 @@ output:
     source_code: https://github.com/neidl-connor-lab/lasvShiny
     theme: flatly 
     vertical_layout: fill
-
-
-
 --- 
 
 ```{r setup global, include=FALSE, warning=FALSE}
@@ -62,6 +59,7 @@ radioButtons("Color", h4("Color"),
 
 tags$i("*Color is for visualization")
 tags$br()
+
 pickerInput("Factor1", h4("Factor"),
              choices  = sort(cytokines), 
              selected = "ct",
@@ -73,8 +71,6 @@ pickerInput("Factor2", h4("Factor 2 (Scatter y-axis)"),
              selected = "PAI1",
              options  = list(`actions-box` = TRUE), multiple = F
              )
-
-
 
 ```
 
@@ -181,7 +177,7 @@ shiny::fluidRow(
   })
 )
     
-fluidRow(
+shiny::fluidRow(
   
   renderPlotly({
       
@@ -211,7 +207,8 @@ s <- function(c){
     ggtitle("Two Factor Scatter Plot") +
     xlab(get.pretty.factor(input$Factor1))+
     ylab(get.pretty.factor(input$Factor2)) +
-    theme(text = element_text(size = 14))
+    theme(text = element_text(size = 14))+
+    theme_pubr() 
   
   }  %>% ggplotly(height = 600, width = 800)
   
@@ -246,7 +243,7 @@ b <- function(f, c) {
             panel.grid.major = element_blank(),
             panel.grid.minor = element_blank(),
             panel.spacing = unit(1.25, "lines"),
-            text = element_text(size = 14)
+            text = element_text(size = 24)
 
             )+
 
@@ -261,7 +258,8 @@ b <- function(f, c) {
                   size=2.5) +
       # theme_pubr() +
       ylab(get.pretty.units(f)) +
-    xlab("Outcome")
+      xlab("Outcome")+
+      theme_pubr() 
 } 
 
 
@@ -282,10 +280,23 @@ renderPlot({
 
   b(input$Factor1, input$Color) + 
 
-    stat_compare_means(comparisons = my_comparisons,
-                       size=4,
-                       label = "p.signif",
-                       method = "wilcox.test") 
+    stat_compare_means(
+                       comparisons = my_comparisons,
+                       size=6,
+                       label = "p.signif"
+                       # , method = "kruskal.test"
+                       # , exact = FALSE
+                       ) +
+      theme_pubr() + 
+
+      theme(
+            plot.title = element_text(hjust = .5),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            panel.spacing = unit(1.25, "lines"),
+            text = element_text(size = 24)
+
+            )
     
 })
 
@@ -326,10 +337,11 @@ r <- function(f){
   pROC::ggroc(rocData[f])+
           coord_fixed() +
           scale_fill_discrete(labels=c(get.pretty.name(f)))+
-          theme_pubr() +
+          # theme_pubr() +
           theme(#legend.position = c(0.65, 0.4),
                 # legend.text = element_text(size = 12),
-                legend.title = element_blank()) 
+                legend.title = element_blank()) +
+          theme_pubr() 
     
   } %>% ggplotly(height = 400, width = 600) #%>% layout(height = 400, width = 600)
 
@@ -356,11 +368,13 @@ names(confusionMat) <- cytokines
 #                                     confusionMat[[c("ct", "PAI1", "DDIMER")[x]]] ) %>%
 #                     DT::datatable()
 
-mainPanel(
+# fluidPage(
+    mainPanel(
 
+    style = "overflow-y: auto;", 
     h4(("Confusion Matrix for Chosen Factor")),
     
-    renderDataTable(confusionMat[[input$Factor1]]),
+    renderDT(confusionMat[[input$Factor1]]),
     
 
     tags$br(),
@@ -377,18 +391,29 @@ mainPanel(
          options  = list(`actions-box` = TRUE),
          multiple = T
          )
-)
+
+    )
+    # )
 ```
 
 ### ROC Data
 
 
 ```{r}
-mainPanel(
-
-  DT::renderDataTable(DT::datatable(rocResFormat))
-  
+fluidPage(
+    
+    mainPanel(    
+        style = "height: 55vh; overflow-y: auto;", 
+        width = 15,
+        renderDT(DT::datatable(rocResFormat)),
+              options = list(
+                        pageLength = 5,
+                        initComplete = JS('function(setting, json) 
+                                          { alert("done"); }')
+              )
+              )
 )
+
 ```
 
 
@@ -398,7 +423,7 @@ Longitudinal
 Column  {.tabset .tabset-fade}
 -----------------------------------------------------------------------
 
-### Individual Markers
+### Markers over time
 ```{r warning=FALSE}
 
 
@@ -473,12 +498,6 @@ longPlots <- function(cases, v, c){
     	           ) +
 
     	theme_pubr() +
-        theme(text = element_text(size = 16),
-    	      legend.title = element_blank(),
-    	      strip.background = element_blank(),
-              # axis.title.y = element_blank(),
-              plot.title = element_text(vjust = .5)
-    	      ) +
         labs(x = "DPI", y = get.pretty.units(v), title = get.pretty.name(v)
              ) +
         # ggtitle(get.pretty.factor(v)) +
@@ -486,7 +505,15 @@ longPlots <- function(cases, v, c){
     	           linetype="dashed", color="black") +
     	geom_smooth(method = "loess", formula = y~x, aes_string(color=c))+
 	    scale_y_continuous(trans = "log10")+
-        scale_x_continuous(name = "DPI", breaks = seq(0,12,by = 3))
+        scale_x_continuous(
+                           name = "DPI",
+                           breaks = seq(0,12,by = 3)) +        
+        theme(text = element_text(size = 16)
+    	      # , strip.background = element_blank()
+              , axis.title.x = element_text()
+              , axis.title.y = element_text()
+
+    	      )
 }
 
 # gp <- longPlots(cases.plot.all, "PAI1", "Dataset") %>% #test the plot %>%
@@ -518,10 +545,10 @@ layout_ggplotly <- function(gp, x = -0.15, y = -0.08){
 fluidRow(
     
     renderPlotly( longPlots(cases.plot.all, input$Factor1, input$Color) %>% #test the plot %>%
-                      ggplotly(height = 500, width = 850)%>%
-        layout(legend = list(orientation = "h", x = 0.25, y = -0.25),
-           title = list(y = 1.75),
-           margin = list(t = 110)) %>% 
+                      ggplotly(height = 500, width = 850) %>%
+        layout(
+            # legend = list(orientation = "h", x = 0.25, y = -0.25),
+               title = list(y = 1.75), margin = list(t = 110)) %>%
         layout_ggplotly )
 )
 
@@ -574,89 +601,89 @@ fluidRow(
 
 
 
-### Prediction by PAI-1 on Day 0
-```{r warning=F}
+<!-- ### Prediction by PAI-1 on Day 0 -->
+<!-- ```{r warning=F} -->
 
 
 
-pai1.predict.fatal <- sqldf("SELECT * FROM long WHERE id IN 
-        (SELECT DISTINCT id FROM long 
-         WHERE dpi = 0 AND var = 'PAI1' AND Value >= Threshold)"
-        ) %>%
-	add_column(Timing = "Predicted Fatal") %>%
-    mutate(Accuracy = case_when(Outcome == "Fatal" ~ "TP, n=61",
-                                Outcome == "Survivor" ~ "FP, n=21"))
+<!-- pai1.predict.fatal <- sqldf("SELECT * FROM long WHERE id IN  -->
+<!--         (SELECT DISTINCT id FROM long  -->
+<!--          WHERE dpi = 0 AND var = 'PAI1' AND Value >= Threshold)" -->
+<!--         ) %>% -->
+<!-- 	add_column(Timing = "Predicted Fatal") %>% -->
+<!--     mutate(Accuracy = case_when(Outcome == "Fatal" ~ "TP, n=61", -->
+<!--                                 Outcome == "Survivor" ~ "FP, n=21")) -->
 
-pai1.predict.surv <- sqldf("SELECT * FROM long WHERE id IN 
-        (SELECT DISTINCT id FROM long 
-         WHERE dpi = 0 AND var = 'PAI1' AND Value < Threshold)"
-        ) %>% 
-	add_column(Timing = "Predicted Survivor")%>%
-    mutate(Accuracy = case_when(Outcome == "Fatal" ~ "FN, n=11",
-                                Outcome == "Survivor" ~ "TN, n=101"))
+<!-- pai1.predict.surv <- sqldf("SELECT * FROM long WHERE id IN  -->
+<!--         (SELECT DISTINCT id FROM long  -->
+<!--          WHERE dpi = 0 AND var = 'PAI1' AND Value < Threshold)" -->
+<!--         ) %>%  -->
+<!-- 	add_column(Timing = "Predicted Survivor")%>% -->
+<!--     mutate(Accuracy = case_when(Outcome == "Fatal" ~ "FN, n=11", -->
+<!--                                 Outcome == "Survivor" ~ "TN, n=101")) -->
 
-pai1.prediction <- rbind(pai1.predict.fatal, pai1.predict.surv) %>% 
-    ungroup() 
-# %>%
-#     mutate(Accuracy = factor(Accuracy, levels = c("TP", "FP", "FN", "TN")))
-
-
-
-# dat_text <- data.frame(
-#     Outcome   = c("Fatal", "Fatal", "Survivor", "Survivor"),
-#     Timing    = c("Predicted Fatal", "Predicted Survivor", "Predicted Fatal", "Predicted Survivor"),
-#     label = c("n=61", "n = 11", "n = 21", "n = 101")
-# )
-
-pai.plot <- function(cases, v){
-
-    
-    ggplot(cases %>% filter(var == v), 
-           aes(x = dpi, y = Value, color=Accuracy)) +
-    	geom_jitter(alpha=0.5
-    	           # position=position_jitterdodge(jitter.width = .5)
-    	           ) +
-    	facet_grid(Outcome ~ Timing, margins = T) +
-    	color_palette(c("red4", "purple4", "blue", "red"))  +
-        # scale_fill_manual(values = rep("gray2", 4)) +
-        theme_pubr()+
-    	theme(text = element_text(size = 16),
-    	      legend.title = element_blank(),
-    	      strip.background = element_blank(),
-    	      axis.title.y = element_blank()
-    	      ) +
-
-    	# xlim(0,12)+
-        labs(x = "DPI", #y = paste0(get.pretty.units(v), "\n"),
-             title = get.pretty.factor(v)) +
-    	geom_hline(aes(yintercept = Threshold), 
-    	           linetype="dashed", color="black") +
-    	geom_smooth(method = "loess", formula = y~x)+
-	    scale_y_continuous(trans = "log10") +
-        scale_x_continuous(name = "DPI", breaks = seq(0,12,by = 3))
-    # +
-    #     geom_text(
-    #         size = 5,
-    #         x = 8, y = .1,
-    #         aes(label = label),
-    #         data    = dat_text,
-    #         inherit.aes = F
-    #         )
-
-}
-
-
-# pai.plot(pai1.prediction, c("PAI1"))  
+<!-- pai1.prediction <- rbind(pai1.predict.fatal, pai1.predict.surv) %>%  -->
+<!--     ungroup()  -->
+<!-- # %>% -->
+<!-- #     mutate(Accuracy = factor(Accuracy, levels = c("TP", "FP", "FN", "TN"))) -->
 
 
 
-fluidRow(
+<!-- # dat_text <- data.frame( -->
+<!-- #     Outcome   = c("Fatal", "Fatal", "Survivor", "Survivor"), -->
+<!-- #     Timing    = c("Predicted Fatal", "Predicted Survivor", "Predicted Fatal", "Predicted Survivor"), -->
+<!-- #     label = c("n=61", "n = 11", "n = 21", "n = 101") -->
+<!-- # ) -->
 
-    renderPlotly( pai.plot(pai1.prediction, input$Factor1)  %>%
-                      ggplotly(height = 700, width = 950)
-                  %>% layout(legend = list(orientation = "h", 
-                                           x = 0.25, y = -.1))
-    )
-)
+<!-- pai.plot <- function(cases, v){ -->
 
-```
+
+<!--     ggplot(cases %>% filter(var == v),  -->
+<!--            aes(x = dpi, y = Value, color=Accuracy)) + -->
+<!--     	geom_jitter(alpha=0.5 -->
+<!--     	           # position=position_jitterdodge(jitter.width = .5) -->
+<!--     	           ) + -->
+<!--     	facet_grid(Outcome ~ Timing, margins = T) + -->
+<!--     	color_palette(c("red4", "purple4", "blue", "red"))  + -->
+<!--         # scale_fill_manual(values = rep("gray2", 4)) + -->
+<!--         theme_pubr()+ -->
+<!--     	theme(text = element_text(size = 16), -->
+<!--     	      legend.title = element_blank(), -->
+<!--     	      strip.background = element_blank(), -->
+<!--     	      axis.title.y = element_blank() -->
+<!--     	      ) + -->
+
+<!--     	# xlim(0,12)+ -->
+<!--         labs(x = "DPI", #y = paste0(get.pretty.units(v), "\n"), -->
+<!--              title = get.pretty.factor(v)) + -->
+<!--     	geom_hline(aes(yintercept = Threshold),  -->
+<!--     	           linetype="dashed", color="black") + -->
+<!--     	geom_smooth(method = "loess", formula = y~x)+ -->
+<!-- 	    scale_y_continuous(trans = "log10") + -->
+<!--         scale_x_continuous(name = "DPI", breaks = seq(0,12,by = 3)) -->
+<!--     # + -->
+<!--     #     geom_text( -->
+<!--     #         size = 5, -->
+<!--     #         x = 8, y = .1, -->
+<!--     #         aes(label = label), -->
+<!--     #         data    = dat_text, -->
+<!--     #         inherit.aes = F -->
+<!--     #         ) -->
+
+<!-- } -->
+
+
+<!-- # pai.plot(pai1.prediction, c("PAI1"))   -->
+
+
+
+<!-- fluidRow( -->
+
+<!--     renderPlotly( pai.plot(pai1.prediction, input$Factor1)  %>% -->
+<!--                       ggplotly(height = 700, width = 950) -->
+<!--                   %>% layout(legend = list(orientation = "h",  -->
+<!--                                            x = 0.25, y = -.1)) -->
+<!--     ) -->
+<!-- ) -->
+
+<!-- ``` -->
